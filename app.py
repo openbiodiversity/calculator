@@ -1,7 +1,15 @@
 import gradio as gr
 import plotly.graph_objects as go
 from datasets import load_dataset
+import ee
+# import geemap
 
+# GEE
+service_account = 'climatebase-july-2023@ee-geospatialml-aquarry.iam.gserviceaccount.com'
+credentials = ee.ServiceAccountCredentials(service_account, 'service_account.json')
+ee.Initialize(credentials)
+
+# Gradio dataset
 dataset = load_dataset("gradio/NYC-Airbnb-Open-Data", split="train")
 df = dataset.to_pandas()
 
@@ -43,10 +51,12 @@ def filter_map(min_price, max_price, boroughs):
 with gr.Blocks() as demo:
     with gr.Column():
         with gr.Row():
-            min_price = gr.Number(value=250, label="Minimum Price")
-            max_price = gr.Number(value=1000, label="Maximum Price")
-        boroughs = gr.CheckboxGroup(choices=["Queens", "Brooklyn", "Manhattan", "Bronx", "Staten Island"], value=["Queens", "Brooklyn"], label="Select Boroughs:")
+            min_price = gr.Number(value=250, label="Project Name")
+            max_price = gr.Number(value=1000, label="Project Description")
+        boroughs = gr.CheckboxGroup(choices=["Queens", "Brooklyn", "Manhattan", "Bronx", "Staten Island"], value=["Queens", "Brooklyn"], label="Select Methodology:")
         btn = gr.Button(value="Update Filter")
+        btn = gr.Button(value="Save")
+        btn = gr.Button(value="Run")
         map = gr.Plot().style()
     demo.load(filter_map, [min_price, max_price, boroughs], map)
     btn.click(filter_map, [min_price, max_price, boroughs], map)
