@@ -1,3 +1,8 @@
 datasets
 plotly
 gradio
+duckdb==0.8.1 
+geemap
+segment-geospatial
+geojson
+yaml
