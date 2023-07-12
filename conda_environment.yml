@@ -1,0 +1,16 @@
+name: openbiodiversity_calculator
+channels:
+  - conda-forge
+  - huggingface
+  - plotly
+dependencies:
+  - datasets
+  - geemap
+  - plotly
+  - segment-geospatial
+  - pip
+  - pip:
+    - duckdb==0.8.1
+    - geojson
+    - gradio
+    - pyyaml
