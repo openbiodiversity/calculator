@@ -1,0 +1,169 @@
+---
+Water:
+  name: Water
+  roi: ''
+  gee_path: JRC/GSW1_1/GlobalSurfaceWater
+  gee_type: image
+  viz:
+    min: 0
+    max: 100
+    palette:
+    - ffffff
+    - ffbbbb
+    - 0000ff
+  bandname: occurrence
+  select: occurrence
+  show: true
+Protected:
+  name: Protected
+  roi: ''
+  gee_path: WCMC/WDPA/current/polygons
+  gee_type: feature_collection
+  viz:
+    palette:
+    - 2ed033
+    - 5aff05
+    - 67b9ff
+    - 5844ff
+    - 0a7618
+    - 2c05ff
+    min: 0
+    max: 1550000
+    opacity: 0.8
+  select: REP_AREA
+  bandname: constant
+  show: true
+Air:
+  name: Air
+  roi: ''
+  gee_path: COPERNICUS/S5P/OFFL/L3_AER_AI
+  gee_type: image_collection
+  viz:
+    min: -1
+    max: 2
+    palette:
+    - black
+    - blue
+    - purple
+    - cyan
+    - green
+    - yellow
+    - red
+  bandname: absorbing_aerosol_index
+  select: absorbing_aerosol_index
+  dates: false
+  show: false
+Soil:
+  name: Soil
+  roi: ''
+  gee_path: OpenLandMap/SOL/SOL_ORGANIC-CARBON_USDA-6A1C_M/v02
+  gee_type: image
+  viz:
+    bands:
+    - b200
+    min: 0
+    max: 12
+    palette:
+    - ffffa0
+    - f7fcb9
+    - d9f0a3
+    - addd8e
+    - 78c679
+    - 41ab5d
+    - '238443'
+    - 005b29
+    - 004b29
+    - 012b13
+    - 00120b
+  select: b0
+  bandname: b0
+  show: false
+Temperature:
+  name: Temperature
+  roi: ''
+  gee_path: MODIS/061/MYD21C1
+  gee_type: image_collection
+  viz:
+    min: 216
+    max: 348
+    palette:
+    - '040274'
+    - '040281'
+    - 0502a3
+    - 0502b8
+    - 0502ce
+    - 0502e6
+    - 0602ff
+    - 235cb1
+    - 307ef3
+    - 269db1
+    - 30c8e2
+    - 32d3ef
+    - 3be285
+    - 3ff38f
+    - 86e26f
+    - 3ae237
+    - b5e22e
+    - d6e21f
+    - fff705
+    - ffd611
+    - ffb613
+    - ff8b13
+    - ff6e08
+    - ff500d
+    - ff0000
+    - de0101
+    - c21301
+    - a71001
+    - '911003'
+  select: LST_Day
+  bandname: LST_Day
+  dates: true
+  show: true
+Habitat:
+  name: Habitat
+  roi: ''
+  gee_path: projects/sat-io/open-datasets/IUCN_HABITAT/iucn_habitatclassification_composite_lvl2_ver004
+  gee_type: image
+  viz: {}
+  bandname: comp_first
+  show: true
+NDVI:
+  name: NDVI
+  roi: ''
+  gee_path: LANDSAT/LC08/C02/T1
+  gee_type: algebraic
+  normalized_difference:
+  - B4
+  - B3
+  viz:
+    palette:
+    - "#d73027"
+    - "#f46d43"
+    - "#fdae61"
+    - "#fee08b"
+    - "#d9ef8b"
+    - "#a6d96a"
+    - "#66bd63"
+    - "#1a9850"
+  bandname: nd
+NDWI:
+  name: NDWI
+  roi: ''
+  gee_path: LANDSAT/LC08/C02/T1
+  gee_type: algebraic
+  normalized_difference:
+  - B3
+  - B5
+  viz:
+    palette:
+    - "#ece7f2"
+    - "#d0d1e6"
+    - "#a6bddb"
+    - "#74a9cf"
+    - "#3690c0"
+    - "#0570b0"
+    - "#045a8d"
+    - "#023858"
+  bandname: nd
+  show: true
