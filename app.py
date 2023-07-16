@@ -169,6 +169,7 @@ class IndexGenerator:
             "value": list(map(self.zonal_mean_index, indices)),
             "area": self.roi.area().getInfo(),  # m^2
             "geojson": str(self.roi.getInfo()),
+            # to-do: coefficient
         }
 
         print("data", data)
@@ -306,45 +307,7 @@ def push_to_md():
         ON CONFLICT (year, project_name) DO UPDATE SET value = excluded.value;
     """
     )
-    print("Saved records")
-
-
-#   preview_table()
-
-
-def filter_map(min_price, max_price, boroughs):
-    filtered_df = df[
-        (df["neighbourhood_group"].isin(boroughs))
-        & (df["price"] > min_price)
-        & (df["price"] < max_price)
-    ]
-    names = filtered_df["name"].tolist()
-    prices = filtered_df["price"].tolist()
-    text_list = [(names[i], prices[i]) for i in range(0, len(names))]
-    fig = go.Figure(
-        go.Scattermapbox(
-            customdata=text_list,
-            lat=filtered_df["latitude"].tolist(),
-            lon=filtered_df["longitude"].tolist(),
-            mode="markers",
-            marker=go.scattermapbox.Marker(size=6),
-            hoverinfo="text",
-            hovertemplate="<b>Name</b>: %{customdata[0]}<br><b>Price</b>: $%{customdata[1]}",
-        )
-    )
-
-    fig.update_layout(
-        mapbox_style="open-street-map",
-        hovermode="closest",
-        mapbox=dict(
-            bearing=0,
-            center=go.layout.mapbox.Center(lat=40.67, lon=-73.90),
-            pitch=0,
-            zoom=9,
-        ),
-    )
-
-    return fig
+    print("upsert records into motherduck")
 
 
 with gr.Blocks() as demo:
