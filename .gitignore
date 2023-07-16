@@ -1,3 +1,7 @@
 .venv
 __pycache__/
 service_account.json
+ee_service_account.json
+md_service_token.txt
+.env
+.vscode
