@@ -171,15 +171,12 @@ class IndexGenerator:
         return df
 
 def set_up_duckdb(service_token_file=None):
-    print('setting up duckdb')
+    print('set up duckdb')
     # use `climatebase` db
-    if service_token_file is not None:
-        with open(service_token_file, 'r') as f:
-            md_service_token=f.read()
-        
-        os.environ['motherduck_token'] = md_service_token
-        con = duckdb.connect('md:climatebase')
+    if not os.getenv('motherduck_token');
+        raise Exception('No motherduck token found. Please set the `motherduck_token` environment variable.')
     else:
+        con = duckdb.connect('md:climatebase')
         con = duckdb.connect(':climatebase:')
         con.sql("USE climatebase;")
 
