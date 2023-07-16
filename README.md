@@ -4,7 +4,7 @@ emoji: {{emoji}}
 colorFrom: indigo
 colorTo: pink
 sdk: gradio
-sdk_version: 3.10
+sdk_version: 3.36.1
 app_file: app.py
 pinned: false
 tags: [climatebase, biocredits]
