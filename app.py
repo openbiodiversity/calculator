@@ -1,4 +1,5 @@
 import datetime
+import logging
 import os
 
 import duckdb
@@ -8,6 +9,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import yaml
 
+# Logging
+logging.basicConfig(format="%(levelname)s:%(message)s", level=logging.DEBUG)
 
 # Define constants
 DATE = "2020-01-01"
@@ -87,7 +90,7 @@ class IndexGenerator:
             try:
                 return yaml.safe_load(stream)
             except yaml.YAMLError as e:
-                print(e)
+                logging.error(e)
                 return None
 
     def show_map(self, map=None):
@@ -142,7 +145,7 @@ class IndexGenerator:
             raise Exception("Failed to generate dataset.")
         if self.show and index_config.get("show"):
             map.addLayer(dataset, index_config["viz"], index_config["name"])
-        print(f"Generated index: {index_config['name']}")
+        logging.info(f"Generated index: {index_config['name']}")
         return dataset
 
     def zonal_mean_index(self, index_key):
@@ -172,13 +175,13 @@ class IndexGenerator:
             # to-do: coefficient
         }
 
-        print("data", data)
+        logging.info("data", data)
         df = pd.DataFrame(data)
         return df
 
 
 def set_up_duckdb():
-    print("set up duckdb")
+    logging.info("set up duckdb")
     # use `climatebase` db
     if not os.getenv("motherduck_token"):
         raise Exception(
@@ -195,7 +198,7 @@ def set_up_duckdb():
 
 
 def authenticate_gee(gee_service_account, gee_service_account_credentials_file):
-    print("authenticate_gee")
+    logging.info("authenticate_gee")
     # to-do: alert if dataset filter date nan
     credentials = ee.ServiceAccountCredentials(
         gee_service_account, gee_service_account_credentials_file
@@ -209,16 +212,16 @@ def load_indices(indices_file):
         try:
             return yaml.safe_load(stream)
         except yaml.YAMLError as e:
-            print(e)
+            logging.error(e)
             return None
 
 
 def create_dataframe(years, project_name):
     dfs = []
-    print(years)
+    logging.info(years)
     indices = load_indices(INDICES_FILE)
     for year in years:
-        print(year)
+        logging.info(year)
         ig = IndexGenerator(
             centroid=LOCATION,
             roi_radius=ROI_RADIUS,
@@ -295,7 +298,7 @@ def calculate_biodiversity_score(start_year, end_year, project_name):
 
 
 def view_all():
-    print("view_all")
+    logging.info("view_all")
     return con.sql(f"SELECT * FROM bioindicator").df()
 
 
@@ -307,7 +310,7 @@ def push_to_md():
         ON CONFLICT (year, project_name) DO UPDATE SET value = excluded.value;
     """
     )
-    print("upsert records into motherduck")
+    logging.info("upsert records into motherduck")
 
 
 with gr.Blocks() as demo:
