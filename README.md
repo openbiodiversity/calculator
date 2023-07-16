@@ -1,3 +1,15 @@
+---
+title: Bioscore calculator
+emoji: {{emoji}}
+colorFrom: indigo
+colorTo: pink
+sdk: gradio
+sdk_version: 3.10
+app_file: app.py
+pinned: false
+tags: climatebase, biocredits
+---
+
 # Bioscore calculator app
 
 This is a simple guide to help you set up and run a Gradio app.
@@ -30,7 +42,7 @@ Install the required Python packages:
 pip3 install -r requirements.txt
 ```
 
-## Running the App
+## Run the App Locally
 
 To start the Gradio app, execute the following command:
 
@@ -44,6 +56,10 @@ The app will start running, and you should see output similar to the following:
 Running on http://127.0.0.1:7860
 Open your web browser and visit http://127.0.0.1:7860 to access the Gradio app.
 ```
+
+
+## Deploy to Huggingface
+
 
 ## Customization
 
