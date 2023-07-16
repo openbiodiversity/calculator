@@ -167,8 +167,8 @@ class IndexGenerator:
             "centroid": str(self.centroid),
             "project_name": self.project_name,
             "value": list(map(self.zonal_mean_index, indices)),
-            "area": roi.area().getInfo(),  # m^2
-            "geojson": str(roi.getInfo()),
+            "area": self.roi.area().getInfo(),  # m^2
+            "geojson": str(self.roi.getInfo()),
         }
 
         print("data", data)
@@ -351,7 +351,7 @@ with gr.Blocks() as demo:
     con = set_up_duckdb()
     authenticate_gee(GEE_SERVICE_ACCOUNT, GEE_SERVICE_ACCOUNT_CREDENTIALS_FILE)
     # Create circle buffer over point
-    # roi = ee.Geometry.Point(*LOCATION).buffer(ROI_RADIUS)
+    roi = ee.Geometry.Point(*LOCATION).buffer(ROI_RADIUS)
 
     # # Load a raw Landsat ImageCollection for a single year.
     # start_date = str(datetime.date(YEAR, 1, 1))
