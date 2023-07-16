@@ -60,6 +60,18 @@ Open your web browser and visit http://127.0.0.1:7860 to access the Gradio app.
 
 ## Deploy to Huggingface
 
+The app is hosted a Huggingface space, under the `hf` host and `main` branch. 
+
+To push changes from main branch to Huggingfage, run:
+
+```bash
+git push hf main
+```
+
+You'll see the app's response in `https://huggingface.co/spaces/openbio/calculator`
+
+❗Note: There's no dev nor staging environment, nor CI. Every push will immediately build and go live.
+
 
 ## Customization
 
