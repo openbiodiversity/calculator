@@ -10,7 +10,6 @@ import yaml
 
 
 # Define constants
-MD_SERVICE_TOKEN = "md_service_token.txt"
 DATE = "2020-01-01"
 YEAR = 2020
 LOCATION = [-74.653370, 5.845328]
