@@ -1,30 +1,16 @@
-import gradio as gr
-import plotly.graph_objects as go
-
-# import ee
-# # import geemap
-
-# # GEE
-# service_account = 'climatebase-july-2023@ee-geospatialml-aquarry.iam.gserviceaccount.com'
-# credentials = ee.ServiceAccountCredentials(service_account, 'service_account.json')
-# ee.Initialize(credentials)
-
-# # Gradio dataset
-# dataset = load_dataset("gradio/NYC-Airbnb-Open-Data", split="train")
-# df = dataset.to_pandas()
-
-import os
-import duckdb
-import pandas as pd
 import datetime
-import ee
+import os
 
-# import geemap
+import duckdb
+import ee
+import gradio as gr
+import pandas as pd
+import plotly.graph_objects as go
 import yaml
+
 
 # Define constants
 MD_SERVICE_TOKEN = "md_service_token.txt"
-# to-do: set-up with papermill parameters
 DATE = "2020-01-01"
 YEAR = 2020
 LOCATION = [-74.653370, 5.845328]
