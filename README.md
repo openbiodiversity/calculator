@@ -1,6 +1,6 @@
 ---
 title: Bioscore calculator
-emoji: {{emoji}}
+emoji: 🌳
 colorFrom: indigo
 colorTo: pink
 sdk: gradio

@@ -1,4 +1,5 @@
 import datetime
+import json
 import logging
 import os
 
@@ -8,9 +9,10 @@ import gradio as gr
 import pandas as pd
 import plotly.graph_objects as go
 import yaml
+from google.oauth2 import service_account
 
 # Logging
-logging.basicConfig(format="%(levelname)s:%(message)s", level=logging.DEBUG)
+logging.basicConfig(format="%(levelname)s:%(message)s", level=logging.INFO)
 
 # Define constants
 DATE = "2020-01-01"
@@ -198,10 +200,12 @@ def set_up_duckdb():
 
 
 def authenticate_gee(gee_service_account, gee_service_account_credentials_file):
+    """
+    Huggingface Spaces does not support secret files, therefore authenticate with an environment variable containing the JSON.
+    """
     logging.info("authenticate_gee")
-    # to-do: alert if dataset filter date nan
     credentials = ee.ServiceAccountCredentials(
-        gee_service_account, gee_service_account_credentials_file
+        gee_service_account, key_data=os.environ["ee_service_account"]
     )
     ee.Initialize(credentials)
 
@@ -314,8 +318,10 @@ def push_to_md():
 
 
 with gr.Blocks() as demo:
-    con = set_up_duckdb()
+    # Environment setup
     authenticate_gee(GEE_SERVICE_ACCOUNT, GEE_SERVICE_ACCOUNT_CREDENTIALS_FILE)
+    con = set_up_duckdb()
+
     # Create circle buffer over point
     roi = ee.Geometry.Point(*LOCATION).buffer(ROI_RADIUS)
 
