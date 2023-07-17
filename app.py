@@ -206,7 +206,6 @@ def authenticate_ee(ee_service_account):
     Huggingface Spaces does not support secret files, therefore authenticate with an environment variable containing the JSON.
     """
     logging.info("authenticate_ee")
-    # print(os.environ.keys())
     credentials = ee.ServiceAccountCredentials(
         ee_service_account, key_data=os.environ["ee_service_account"]
     )
@@ -244,7 +243,6 @@ def filter_map():
     prepared_statement = \
         con.execute("SELECT geometry FROM project WHERE name = ? LIMIT 1",
                     ["My project name"]).fetchall()
-    print(prepared_statement)
     features = \
         json.loads(prepared_statement[0][0].replace("\'", "\""))['features']
     geometry = features[0]['geometry']
@@ -296,8 +294,6 @@ def calculate_biodiversity_score(start_year, end_year, project_name):
             USE climatebase;
             CREATE TABLE IF NOT EXISTS bioindicator (year BIGINT, project_name VARCHAR(255), value DOUBLE, area DOUBLE, score DOUBLE, CONSTRAINT unique_year_project_name UNIQUE (year, project_name));
         """)
-    print(con.execute("SELECT * FROM bioindicator WHERE (year > ? AND year <= ? AND project_name = ?)",
-                    [start_year, end_year, project_name]).fetchall())
     scores = \
         con.execute("SELECT * FROM bioindicator WHERE (year > ? AND year <= ? AND project_name = ?)",
                     [start_year, end_year, project_name]).fetchall().df()
