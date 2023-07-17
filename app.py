@@ -1,17 +1,5 @@
 import gradio as gr
 import plotly.graph_objects as go
-# import ee
-# # import geemap
-
-# # GEE
-# service_account = 'climatebase-july-2023@ee-geospatialml-aquarry.iam.gserviceaccount.com'
-# credentials = ee.ServiceAccountCredentials(service_account, 'service_account.json')
-# ee.Initialize(credentials)
-
-# # Gradio dataset
-# dataset = load_dataset("gradio/NYC-Airbnb-Open-Data", split="train")
-# df = dataset.to_pandas()
-
 import os
 import duckdb
 import pandas as pd
@@ -19,6 +7,9 @@ import datetime
 import ee
 # import geemap
 import yaml
+import numpy as np
+import json
+import geojson
 
 # Define constants
 MD_SERVICE_TOKEN = 'md_service_token.txt'
@@ -162,8 +153,8 @@ class IndexGenerator:
             "centroid": str(self.centroid),
             "project_name": self.project_name,
             "value": list(map(self.zonal_mean_index, indices)),
-            "area": roi.area().getInfo(), # m^2
-            "geojson": str(roi.getInfo()),
+            "area": self.roi.area().getInfo(), # m^2
+            "geojson": str(self.roi.getInfo()),
             }
 
         print('data', data)
@@ -214,47 +205,48 @@ def create_dataframe(years, project_name):
         dfs.append(df)
     return pd.concat(dfs)
 
-# def preview_table():
-#     con.sql("FROM bioindicator;").show()
+def filter_map():
+    prepared_statement = \
+        con.execute("SELECT geometry FROM project WHERE name = ? LIMIT 1",
+                    ["My project name"]).fetchall()
+    features = \
+        json.loads(prepared_statement[0][0].replace("\'", "\""))['features']
+    geometry = features[0]['geometry']
+    x_centroid = np.mean(np.array(geometry["coordinates"])[0, :, 0])
+    y_centroid = np.mean(np.array(geometry["coordinates"])[0, :, 1])
+    fig = go.Figure(go.Scattermapbox(
+        mode = "markers",
+        lon = [x_centroid], lat = [y_centroid],
+        marker = {'size': 20, 'color': ["cyan"]}))
 
-# if __name__ == '__main__':
+    fig.update_layout(
+        mapbox = {
+            'style': "stamen-terrain",
+            'center': { 'lon': x_centroid, 'lat': y_centroid},
+            'zoom': 12, 'layers': [{
+                'source': {
+                    'type': "FeatureCollection",
+                    'features': [{
+                        'type': "Feature",
+                        'geometry': geometry
+                    }]
+                },
+                'type': "fill", 'below': "traces", 'color': "royalblue"}]},
+        margin = {'l':0, 'r':0, 'b':0, 't':0})
+    
+    return fig
 
-
-  # Map = geemap.Map()
-
-
-  # # Create a cloud-free composite with custom parameters for cloud score threshold and percentile.
-  # composite_cloudfree = ee.Algorithms.Landsat.simpleComposite(**{
-  #   'collection': collection,
-  #   'percentile': 75,
-  #   'cloudScoreRange': 5
-  # })
-
-  # Map.addLayer(composite_cloudfree, {'bands': ['B4', 'B3', 'B2'], 'max': 128}, 'Custom TOA composite')
-  # Map.centerObject(roi, 14)
-
-
-  # ig = IndexGenerator(centroid=LOCATION, year=2015, indices_file=INDICES_FILE, project_name='Test Project', map=Map)
-  # dataset = ig.generate_index(indices['Air'])
-
-  # minMax = dataset.clip(roi).reduceRegion(
-  #   geometry = roi,
-  #   reducer = ee.Reducer.minMax(),
-  #   scale= 3000,
-  #   maxPixels= 10e3,
-  # )
-
-  # minMax.getInfo()
 def calculate_biodiversity_score(start_year, end_year, project_name):
     years = []
     for year in range(start_year, end_year):
-        row_exists = con.sql(f"SELECT COUNT(1) FROM bioindicator WHERE (year = {year} AND project_name = '{project_name}')").fetchall()[0][0]
+        row_exists = \
+            con.execute("SELECT COUNT(1) FROM bioindicator WHERE (year = ? AND project_name = '?')",
+                        [year, project_name]).fetchall()[0][0]
         if not row_exists:
             years.append(year)
 
     if len(years)>0:
         df = create_dataframe(years, project_name)
-        # con.sql('FROM df LIMIT 5').show()
 
         # Write score table to `_temptable`
         con.sql('CREATE OR REPLACE TABLE _temptable AS SELECT *, (value * area) AS score FROM (SELECT year, project_name, AVG(value) AS value, area  FROM df GROUP BY year, project_name, area ORDER BY project_name)')
@@ -265,12 +257,14 @@ def calculate_biodiversity_score(start_year, end_year, project_name):
             USE climatebase;
             CREATE TABLE IF NOT EXISTS bioindicator (year BIGINT, project_name VARCHAR(255), value DOUBLE, area DOUBLE, score DOUBLE, CONSTRAINT unique_year_project_name UNIQUE (year, project_name));
         """)
-
-    return con.sql(f"SELECT * FROM bioindicator WHERE (year > {start_year} AND year <= {end_year} AND project_name = '{project_name}')").df()
+    scores = \
+        con.execute("SELECT * FROM bioindicator WHERE (year > ? AND year <= ? AND project_name = '?')",
+                    [start_year, end_year, project_name]).fetchall().df()
+    return scores
 
 def view_all():
     print('view_all')
-    return con.sql(f"SELECT * FROM bioindicator").df()
+    return con.sql("SELECT * FROM bioindicator").df()
 
 def push_to_md():
     # UPSERT project record
@@ -280,68 +274,16 @@ def push_to_md():
     """)
     print('Saved records')
 
-#   preview_table()
-
-def filter_map(min_price, max_price, boroughs):
-
-    filtered_df = df[(df['neighbourhood_group'].isin(boroughs)) & 
-          (df['price'] > min_price) & (df['price'] < max_price)]
-    names = filtered_df["name"].tolist()
-    prices = filtered_df["price"].tolist()
-    text_list = [(names[i], prices[i]) for i in range(0, len(names))]
-    fig = go.Figure(go.Scattermapbox(
-            customdata=text_list,
-            lat=filtered_df['latitude'].tolist(),
-            lon=filtered_df['longitude'].tolist(),
-            mode='markers',
-            marker=go.scattermapbox.Marker(
-                size=6
-            ),
-            hoverinfo="text",
-            hovertemplate='<b>Name</b>: %{customdata[0]}<br><b>Price</b>: $%{customdata[1]}'
-        ))
-
-    fig.update_layout(
-        mapbox_style="open-street-map",
-        hovermode='closest',
-        mapbox=dict(
-            bearing=0,
-            center=go.layout.mapbox.Center(
-                lat=40.67,
-                lon=-73.90
-            ),
-            pitch=0,
-            zoom=9
-        ),
-    )
-
-    return fig
-
 with gr.Blocks() as demo:
     con = set_up_duckdb(MD_SERVICE_TOKEN)
     authenticate_gee(GEE_SERVICE_ACCOUNT, GEE_SERVICE_ACCOUNT_CREDENTIALS_FILE)
-    # Create circle buffer over point
-    # roi = ee.Geometry.Point(*LOCATION).buffer(ROI_RADIUS)
-
-    # # Load a raw Landsat ImageCollection for a single year.
-    # start_date = str(datetime.date(YEAR, 1, 1))
-    # end_date = str(datetime.date(YEAR, 12, 31))
-    # collection = (
-    #     ee.ImageCollection('LANDSAT/LC08/C02/T1')
-    #     .filterDate(start_date, end_date)
-    #     .filterBounds(roi)
-    # )
-
-    # indices = load_indices(INDICES_FILE)
-    # push_to_md(START_YEAR, END_YEAR, 'Test Project')
     with gr.Column():
-        # map = gr.Plot().style()
+        m1 = gr.Plot()
         with gr.Row():
             start_year = gr.Number(value=2017, label="Start Year", precision=0)
             end_year = gr.Number(value=2022, label="End Year", precision=0)
             project_name = gr.Textbox(label='Project Name')
-        # boroughs = gr.CheckboxGroup(choices=["Queens", "Brooklyn", "Manhattan", "Bronx", "Staten Island"], value=["Queens", "Brooklyn"], label="Select Methodology:")
-        # btn = gr.Button(value="Update Filter")
+
         with gr.Row():
             calc_btn = gr.Button(value="Calculate!")
             view_btn = gr.Button(value="View all")
@@ -351,10 +293,9 @@ with gr.Blocks() as demo:
             datatype=["number", "str", "number"],
             label="Biodiversity scores by year",
         )
-    # demo.load(filter_map, [min_price, max_price, boroughs], map)
-    # btn.click(filter_map, [min_price, max_price, boroughs], map)
-    calc_btn.click(calculate_biodiversity_score, inputs=[start_year, end_year, project_name], outputs=results_df)
-    view_btn.click(view_all, outputs=results_df)
+    demo.load(filter_map, outputs=[m1])
+    calc_btn.click(calculate_biodiversity_score, inputs=[start_year, end_year, project_name], outputs=[results_df])
+    view_btn.click(view_all, outputs=[results_df])
     save_btn.click(push_to_md)
 
 demo.launch()
