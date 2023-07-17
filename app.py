@@ -320,8 +320,10 @@ def push_to_md():
     logging.info("upsert records into motherduck")
 
 
-def motherduck_list_projects():
-    return con.sql("SELECT DISTINCT name FROM project").df()
+def motherduck_list_projects(author_id):
+    return con.sql(f"""
+        SELECT DISTINCT name FROM project WHERE authorId = '{author_id}'
+    """).df()
 
 
 with gr.Blocks() as demo:
@@ -371,8 +373,11 @@ with gr.Blocks() as demo:
     view_btn.click(view_all, outputs=results_df)
     save_btn.click(push_to_md)
 
-    def update_project_dropdown_list(x):
-        projects = motherduck_list_projects()
+    def update_project_dropdown_list(url_params):
+        print('url_params', url_params['username'])
+
+        projects = motherduck_list_projects(author_id = url_params['username'])
+        print('projects', projects)
         # to-do: filter projects based on user
         return gr.Dropdown.update(choices=projects["name"].tolist())
 
