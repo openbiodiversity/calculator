@@ -1,3 +1,15 @@
+---
+title: Bioscore calculator
+emoji: 🌳
+colorFrom: indigo
+colorTo: pink
+sdk: gradio
+sdk_version: 3.36.1
+app_file: app.py
+pinned: false
+tags: [climatebase, biocredits]
+---
+
 # Bioscore calculator app
 
 This is a simple guide to help you set up and run a Gradio app.
@@ -30,7 +42,7 @@ Install the required Python packages:
 pip3 install -r requirements.txt
 ```
 
-## Running the App
+## Run the App Locally
 
 To start the Gradio app, execute the following command:
 
@@ -44,6 +56,22 @@ The app will start running, and you should see output similar to the following:
 Running on http://127.0.0.1:7860
 Open your web browser and visit http://127.0.0.1:7860 to access the Gradio app.
 ```
+
+
+## Deploy to Huggingface
+
+The app is hosted a Huggingface space, under the `hf` host and `main` branch. 
+
+To push changes from main branch to Huggingfage, run:
+
+```bash
+git push hf main
+```
+
+You'll see the app's response in `https://huggingface.co/spaces/openbio/calculator`
+
+❗Note: There's no dev nor staging environment, nor CI. Every push will immediately build and go live.
+
 
 ## Customization
 
