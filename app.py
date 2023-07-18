@@ -14,6 +14,9 @@ import json
 import geojson
 from google.oauth2 import service_account
 
+
+from utils.js import get_window_url_params
+
 # Logging
 logging.basicConfig(format="%(levelname)s:%(message)s", level=logging.INFO)
 
@@ -239,7 +242,7 @@ def create_dataframe(years, project_name):
         dfs.append(df)
     return pd.concat(dfs)
 
-def filter_map(project_name):
+def show_project_map(project_name):
     prepared_statement = \
         con.execute("SELECT geometry FROM project WHERE name = ? LIMIT 1",
                     [project_name]).fetchall()
@@ -307,9 +310,9 @@ def calculate_biodiversity_score(start_year, end_year, project_name):
                     [start_year, end_year, project_name]).df()
     return scores
 
-def view_all():
-    logging.info("view_all")
-    return con.sql("SELECT * FROM bioindicator").df()
+def motherduck_list_projects(author_id):
+    return \
+        con.execute("SELECT DISTINCT name FROM project WHERE authorId = ? AND geometry != 'null'", [author_id]).df()
 
 
 with gr.Blocks() as demo:
@@ -319,21 +322,50 @@ with gr.Blocks() as demo:
     with gr.Column():
         m1 = gr.Plot()
         with gr.Row():
+            project_name = gr.Dropdown([], label="Project", value="Select project")
             start_year = gr.Number(value=2017, label="Start Year", precision=0)
             end_year = gr.Number(value=2022, label="End Year", precision=0)
-            project_name = gr.Textbox(label='Project Name')
-
         with gr.Row():
+            view_btn = gr.Button(value="Show project map")
             calc_btn = gr.Button(value="Calculate!")
-            view_btn = gr.Button(value="View all")
-            save_btn = gr.Button(value="Save")
+            # save_btn = gr.Button(value="Save")
         results_df = gr.Dataframe(
             headers=["Year", "Project Name", "Score"],
             datatype=["number", "str", "number"],
             label="Biodiversity scores by year",
         )
-    demo.load(filter_map, inputs=[project_name], outputs=[m1])
-    calc_btn.click(calculate_biodiversity_score, inputs=[start_year, end_year, project_name], outputs=[results_df])
-    view_btn.click(view_all, outputs=[results_df])
-    # save_btn.click(push_to_md)
+    calc_btn.click(
+        calculate_biodiversity_score,
+        inputs=[start_year, end_year, project_name],
+        outputs=results_df,
+    )
+    view_btn.click(
+        fn=show_project_map,
+        inputs=[project_name],
+        outputs=[m1],
+        )
+
+    def update_project_dropdown_list(url_params):
+        username = url_params.get("username", "default")
+        projects = motherduck_list_projects(author_id=username)
+        # to-do: filter projects based on user
+        return gr.Dropdown.update(choices=projects["name"].tolist())
+
+    # Get url params
+    url_params = gr.JSON({"username": "default"}, visible=False, label="URL Params")
+
+    # Gradio has a bug
+    # For dropdown to update by demo.load, dropdown value must be called downstream
+    b1 = gr.Button("Hidden button that fixes bug.", visible=False)
+    b1.click(lambda x: x, inputs=project_name, outputs=[])
+
+    # Update project dropdown list on page load
+    demo.load(
+        fn=update_project_dropdown_list,
+        inputs=[url_params],
+        outputs=[project_name],
+        _js=get_window_url_params,
+        queue=False,
+    )
+
 demo.launch()
