@@ -10,8 +10,6 @@ import pandas as pd
 import plotly.graph_objects as go
 import yaml
 import numpy as np
-import json
-import geojson
 from google.oauth2 import service_account
 
 
