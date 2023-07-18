@@ -239,10 +239,10 @@ def create_dataframe(years, project_name):
         dfs.append(df)
     return pd.concat(dfs)
 
-def filter_map():
+def filter_map(project_name):
     prepared_statement = \
         con.execute("SELECT geometry FROM project WHERE name = ? LIMIT 1",
-                    ["My project name"]).fetchall()
+                    [project_name]).fetchall()
     features = \
         json.loads(prepared_statement[0][0].replace("\'", "\""))['features']
     geometry = features[0]['geometry']
@@ -294,25 +294,22 @@ def calculate_biodiversity_score(start_year, end_year, project_name):
             USE climatebase;
             CREATE TABLE IF NOT EXISTS bioindicator (year BIGINT, project_name VARCHAR(255), value DOUBLE, area DOUBLE, score DOUBLE, CONSTRAINT unique_year_project_name UNIQUE (year, project_name));
         """)
+        # UPSERT project record
+        con.sql(
+            """
+            INSERT INTO bioindicator FROM _temptable
+            ON CONFLICT (year, project_name) DO UPDATE SET value = excluded.value;
+        """
+        )
+        logging.info("upsert records into motherduck")
     scores = \
-        con.execute("SELECT * FROM bioindicator WHERE (year > ? AND year <= ? AND project_name = ?)",
-                    [start_year, end_year, project_name]).fetchall().df()
+        con.execute("SELECT * FROM bioindicator WHERE (year >= ? AND year <= ? AND project_name = ?)",
+                    [start_year, end_year, project_name]).df()
     return scores
 
 def view_all():
     logging.info("view_all")
     return con.sql("SELECT * FROM bioindicator").df()
-
-
-def push_to_md():
-    # UPSERT project record
-    con.sql(
-        """
-        INSERT INTO bioindicator FROM _temptable
-        ON CONFLICT (year, project_name) DO UPDATE SET value = excluded.value;
-    """
-    )
-    logging.info("upsert records into motherduck")
 
 
 with gr.Blocks() as demo:
@@ -335,8 +332,8 @@ with gr.Blocks() as demo:
             datatype=["number", "str", "number"],
             label="Biodiversity scores by year",
         )
-    demo.load(filter_map, outputs=[m1])
+    demo.load(filter_map, inputs=[project_name], outputs=[m1])
     calc_btn.click(calculate_biodiversity_score, inputs=[start_year, end_year, project_name], outputs=[results_df])
     view_btn.click(view_all, outputs=[results_df])
-    save_btn.click(push_to_md)
+    # save_btn.click(push_to_md)
 demo.launch()
