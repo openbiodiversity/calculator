@@ -14,7 +14,6 @@ from utils import duckdb_queries as dq
 from . import logging
 
 GEE_SERVICE_ACCOUNT = "climatebase-july-2023@ee-geospatialml-aquarry.iam.gserviceaccount.com"
-ROI_RADIUS = 20000
 INDICES_FILE = "indices.yaml"
 
 
@@ -23,28 +22,21 @@ class IndexGenerator:
     A class to generate indices and compute zonal means.
 
         Args:
-            centroid (tuple): The centroid coordinates (latitude, longitude) of the region of interest.
-            year (int): The year for which indices are generated.
-            roi_radius (int, optional): The radius (in meters) for creating a buffer around the centroid as the region of interest. Defaults to 20000.
-            project_name (str, optional): The name of the project. Defaults to "".
             map (geemap.Map, optional): Map object for mapping. Defaults to None (i.e. no map created)
     """
 
     def __init__(
         self,
-        indices_file,
         map=None,
     ):
         # Authenticate to GEE & DuckDB
         self._authenticate_ee(GEE_SERVICE_ACCOUNT)
 
         # Set instance variables
-        self.indices = self._load_indices(indices_file)
+        self.indices = self._load_indices(INDICES_FILE)
         self.map = map
-        if self.map is not None:
-            self.show = True
-        else:
-            self.show = False
+        self.show = True if self.map is not None else False
+
 
     def _cloudfree(self, gee_path, daterange):
         """
@@ -149,15 +141,16 @@ class IndexGenerator:
             return out[index_config.get("bandname")]
         return out
 
-    def generate_composite_index_df(self, year, indices=[]):
+    def generate_composite_index_df(self, year, project_geometry, indices=[]):
+        
         data = {
             "metric": indices,
             "year": year,
-            "centroid": str(self.centroid), # to-do: self.roi.centroid().getInfo()
-            "project_name": self.project_name,
+            "centroid": "",
+            "project_name": "",
             "value": list(map(self.zonal_mean_index, indices, repeat(year))),
-            "area": self.roi.area().getInfo(),  # m^2
-            "geojson": str(self.roi.getInfo()),
+            "area": self.roi.area().getInfo(),  # m^2 to-do: calculate with duckdb
+            "geojson": "",
             # to-do: coefficient
         }
 
@@ -177,15 +170,30 @@ class IndexGenerator:
         ee.Initialize(credentials)
         logging.info("Authenticated to Google Earth Engine.")
 
-    def _create_dataframe(self, years, project_name):
+    def _calculate_yearly_index(self, years, project_name):
         dfs = []
         logging.info(years)
+        project_geometry = dq.get_project_geometry(project_name)
+        project_centroid = dq.get_project_centroid(project_name)
+        # to-do: refactor to involve less transformations
+        _polygon = json.dumps(json.loads(project_geometry[0][0])['features'][0]['geometry'])
+        # to-do: don't use self.roi and instead pass patameter strategically
+        self.roi = ee.Geometry.Polygon(json.loads(_polygon)['coordinates'])
+
+        # to-do: pararelize?
         for year in years:
             logging.info(year)
             self.project_name = project_name
-            df = self.generate_composite_index_df(year, list(self.indices.keys()))
+            df = self.generate_composite_index_df(year, project_geometry, list(self.indices.keys()))
             dfs.append(df)
-        return pd.concat(dfs)
+
+        # Concatenate all dataframes
+        df_concat = pd.concat(dfs)
+        df_concat['centroid'] = project_centroid
+        df_concat['project_name'] = project_name
+        df_concat['geojson'] = project_geometry
+        breakpoint()
+        return df_concat
 
     # h/t: https://community.plotly.com/t/dynamic-zoom-for-mapbox/32658/12
     def _latlon_to_config(self, longitudes=None, latitudes=None):
@@ -234,8 +242,8 @@ class IndexGenerator:
         return zoom, b_box["center"]
 
     def show_project_map(self, project_name):
-        prepared_statement = dq.get_project_geometry(project_name)
-        features = json.loads(prepared_statement[0][0].replace("'", '"'))["features"]
+        project_geometry = dq.get_project_geometry(project_name)
+        features = json.loads(project_geometry[0][0].replace("'", '"'))["features"]
         geometry = features[0]["geometry"]
         longitudes = np.array(geometry["coordinates"])[0, :, 0]
         latitudes = np.array(geometry["coordinates"])[0, :, 1]
@@ -279,10 +287,10 @@ class IndexGenerator:
                 years.append(year)
 
         if len(years) > 0:
-            df = self._create_dataframe(years, project_name)
+            df = self._calculate_yearly_index(years, project_name)
 
             # Write score table to `_temptable`
-            dq.write_score_to_temptable()
+            dq.write_score_to_temptable(df)
 
             # Create `bioindicator` table IF NOT EXISTS.
             dq.get_or_create_bioindicator_table()
@@ -294,8 +302,3 @@ class IndexGenerator:
         return scores
 
 
-# Instantiate outside gradio app to avoid re-initializing GEE, which is slow
-indexgenerator = IndexGenerator(
-    roi_radius=ROI_RADIUS,
-    indices_file=INDICES_FILE,
-)
