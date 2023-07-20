@@ -34,9 +34,9 @@ class IndexGenerator:
         # Authenticate to GEE & DuckDB
         self._authenticate_ee(GEE_SERVICE_ACCOUNT)
 
-        # Set instance variables
-        self.indices = self._load_indices(INDICES_FILE)
-        breakpoint()
+        # Use defined subset of indices
+        all_indices = self._load_indices(INDICES_FILE)
+        self.indices = {k: all_indices[k] for k in indices}
 
     def _cloudfree(self, gee_path, daterange):
         """
@@ -85,6 +85,7 @@ class IndexGenerator:
         daterange = [start_date, end_date]
 
         # Calculate index based on type
+        logging.info(f"Generating index: {index_config['name']} of type {index_config['gee_type']}")
         match index_config["gee_type"]:
             case "image":
                 dataset = ee.Image(index_config["gee_path"]).clip(self.roi)
@@ -118,10 +119,6 @@ class IndexGenerator:
 
         if not dataset:
             raise Exception("Failed to generate dataset.")
-
-        # Whether to display on GEE map
-        if self.show and index_config.get("show"):
-            map.addLayer(dataset, index_config["viz"], index_config["name"])
 
         logging.info(f"Generated index: {index_config['name']}")
         return dataset
