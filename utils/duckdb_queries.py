@@ -28,12 +28,16 @@ def get_project_geometry(project_name):
         "SELECT geometry FROM project WHERE name = ? LIMIT 1", [project_name]
     ).fetchall()
 
+
 def get_project_centroid(project_name):
     # Workaround to get centroid of project
     # To-do: refactor to only use DuckDB spatial extension
     _geom = get_project_geometry(project_name)
-    _polygon = json.dumps(json.loads(_geom[0][0])['features'][0]['geometry'])
-    return con.sql(f"SELECT ST_X(ST_Centroid(ST_GeomFromGeoJSON('{_polygon}'))) AS longitude, ST_Y(ST_Centroid(ST_GeomFromGeoJSON('{_polygon}'))) AS latitude;").fetchall()[0]
+    _polygon = json.dumps(json.loads(_geom[0][0])["features"][0]["geometry"])
+    return con.sql(
+        f"SELECT ST_X(ST_Centroid(ST_GeomFromGeoJSON('{_polygon}'))) AS longitude, ST_Y(ST_Centroid(ST_GeomFromGeoJSON('{_polygon}'))) AS latitude;"
+    ).fetchall()[0]
+
 
 def get_project_scores(project_name, start_year, end_year):
     return con.execute(

@@ -13,7 +13,9 @@ from utils import duckdb_queries as dq
 
 from . import logging
 
-GEE_SERVICE_ACCOUNT = "climatebase-july-2023@ee-geospatialml-aquarry.iam.gserviceaccount.com"
+GEE_SERVICE_ACCOUNT = (
+    "climatebase-july-2023@ee-geospatialml-aquarry.iam.gserviceaccount.com"
+)
 INDICES_FILE = "indices.yaml"
 
 
@@ -35,7 +37,6 @@ class IndexGenerator:
         # Set instance variables
         self.indices = self._load_indices(INDICES_FILE)
         breakpoint()
-
 
     def _cloudfree(self, gee_path, daterange):
         """
@@ -141,7 +142,6 @@ class IndexGenerator:
         return out
 
     def generate_composite_index_df(self, year, project_geometry, indices=[]):
-        
         data = {
             "metric": indices,
             "year": year,
@@ -175,22 +175,26 @@ class IndexGenerator:
         project_geometry = dq.get_project_geometry(project_name)
         project_centroid = dq.get_project_centroid(project_name)
         # to-do: refactor to involve less transformations
-        _polygon = json.dumps(json.loads(project_geometry[0][0])['features'][0]['geometry'])
+        _polygon = json.dumps(
+            json.loads(project_geometry[0][0])["features"][0]["geometry"]
+        )
         # to-do: don't use self.roi and instead pass patameter strategically
-        self.roi = ee.Geometry.Polygon(json.loads(_polygon)['coordinates'])
+        self.roi = ee.Geometry.Polygon(json.loads(_polygon)["coordinates"])
 
         # to-do: pararelize?
         for year in years:
             logging.info(year)
             self.project_name = project_name
-            df = self.generate_composite_index_df(year, project_geometry, list(self.indices.keys()))
+            df = self.generate_composite_index_df(
+                year, project_geometry, list(self.indices.keys())
+            )
             dfs.append(df)
 
         # Concatenate all dataframes
         df_concat = pd.concat(dfs)
-        df_concat['centroid'] = project_centroid
-        df_concat['project_name'] = project_name
-        df_concat['geojson'] = project_geometry
+        df_concat["centroid"] = project_centroid
+        df_concat["project_name"] = project_name
+        df_concat["geojson"] = project_geometry
         breakpoint()
         return df_concat
 
@@ -299,5 +303,3 @@ class IndexGenerator:
             logging.info("upserted records into motherduck")
         scores = dq.get_project_scores(project_name, start_year, end_year)
         return scores
-
-
