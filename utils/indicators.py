@@ -85,7 +85,9 @@ class IndexGenerator:
         daterange = [start_date, end_date]
 
         # Calculate index based on type
-        logging.info(f"Generating index: {index_config['name']} of type {index_config['gee_type']}")
+        logging.info(
+            f"Generating index: {index_config['name']} of type {index_config['gee_type']}"
+        )
         match index_config["gee_type"]:
             case "image":
                 dataset = ee.Image(index_config["gee_path"]).clip(self.roi)
@@ -140,7 +142,7 @@ class IndexGenerator:
 
         if index_config.get("bandname"):
             return out[index_config.get("bandname")]
-        
+
         logging.info(f"Calculated zonal mean for {index_key}.")
         return out
 
@@ -152,7 +154,7 @@ class IndexGenerator:
             "project_name": "",
             "value": list(map(self.zonal_mean_index, indices, repeat(year))),
             # to-do: calculate with duckdb; also, should be part of project table instead
-            "area": self.roi.area().getInfo(),  # m^2 
+            "area": self.roi.area().getInfo(),  # m^2
             "geojson": "",
             # to-do: coefficient
         }
