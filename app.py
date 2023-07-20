@@ -10,10 +10,10 @@ import pandas as pd
 import plotly.graph_objects as go
 import yaml
 import numpy as np
-from google.oauth2 import service_account
 
 
-from utils.js import get_window_url_params
+from utils.gradio import get_window_url_params
+from utils.duckdb_queries import list_projects_by_author, get_project_geometry
 
 # Logging
 logging.basicConfig(format="%(levelname)s:%(message)s", level=logging.INFO)
@@ -47,25 +47,32 @@ class IndexGenerator:
         self,
         centroid,
         roi_radius,
-        year,
         indices_file,
         project_name="",
         map=None,
     ):
+
+
+        # Authenticate to GEE & DuckDB
+        self._authenticate_ee(GEE_SERVICE_ACCOUNT)
+        self.con = self._get_duckdb_conn()
+
+
+        # Set instance variables
         self.indices = self._load_indices(indices_file)
         self.centroid = centroid
         self.roi = ee.Geometry.Point(*centroid).buffer(roi_radius)
-        self.year = year
-        self.start_date = str(datetime.date(self.year, 1, 1))
-        self.end_date = str(datetime.date(self.year, 12, 31))
-        self.daterange = [self.start_date, self.end_date]
-        self.project_name = project_name
+        # self.start_date = str(datetime.date(self.year, 1, 1))
+        # self.end_date = str(datetime.date(self.year, 12, 31))
+        # self.daterange = [self.start_date, self.end_date]
+        # self.project_name = project_name
         self.map = map
         if self.map is not None:
             self.show = True
         else:
             self.show = False
 
+ 
     def _cloudfree(self, gee_path):
         """
         Internal method to generate a cloud-free composite.
@@ -184,208 +191,195 @@ class IndexGenerator:
         df = pd.DataFrame(data)
         return df
 
+    @staticmethod
+    def _get_duckdb_conn():
+        logging.info("Configuring DuckDB connection...")
+        # use `climatebase` db
+        if not os.getenv("motherduck_token"):
+            raise Exception(
+                "No motherduck token found. Please set the `motherduck_token` environment variable."
+            )
+        else:
+            con = duckdb.connect("md:climatebase")
+            con.sql("USE climatebase;")
 
-def set_up_duckdb():
-    logging.info("set up duckdb")
-    # use `climatebase` db
-    if not os.getenv("motherduck_token"):
-        raise Exception(
-            "No motherduck token found. Please set the `motherduck_token` environment variable."
-        )
-    else:
-        con = duckdb.connect("md:climatebase")
-        con.sql("USE climatebase;")
+        # load extensions
+        con.sql("""INSTALL spatial; LOAD spatial;""")
+        logging.info("Configured DuckDB connection.")
 
-    # load extensions
-    con.sql("""INSTALL spatial; LOAD spatial;""")
+        return con
 
-    return con
-
-
-def authenticate_ee(ee_service_account):
-    """
-    Huggingface Spaces does not support secret files, therefore authenticate with an environment variable containing the JSON.
-    """
-    logging.info("authenticate_ee")
-    credentials = ee.ServiceAccountCredentials(
-        ee_service_account, key_data=os.environ["ee_service_account"]
-    )
-    ee.Initialize(credentials)
-
-
-def load_indices(indices_file):
-    # Read index configurations
-    with open(indices_file, "r") as stream:
-        try:
-            return yaml.safe_load(stream)
-        except yaml.YAMLError as e:
-            logging.error(e)
-            return None
-
-
-def create_dataframe(years, project_name):
-    dfs = []
-    logging.info(years)
-    indices = load_indices(INDICES_FILE)
-    for year in years:
-        logging.info(year)
-        ig = IndexGenerator(
-            centroid=LOCATION,
-            roi_radius=ROI_RADIUS,
-            year=year,
-            indices_file=INDICES_FILE,
-            project_name=project_name,
-        )
-        df = ig.generate_composite_index_df(list(indices.keys()))
-        dfs.append(df)
-    return pd.concat(dfs)
-
-
-# h/t: https://community.plotly.com/t/dynamic-zoom-for-mapbox/32658/12
-def get_plotting_zoom_level_and_center_coordinates_from_lonlat_tuples(
-    longitudes=None, latitudes=None
-):
-    """Function documentation:\n
-    Basic framework adopted from Krichardson under the following thread:
-    https://community.plotly.com/t/dynamic-zoom-for-mapbox/32658/7
-
-    # NOTE:
-    # THIS IS A TEMPORARY SOLUTION UNTIL THE DASH TEAM IMPLEMENTS DYNAMIC ZOOM
-    # in their plotly-functions associated with mapbox, such as go.Densitymapbox() etc.
-
-    Returns the appropriate zoom-level for these plotly-mapbox-graphics along with
-    the center coordinate tuple of all provided coordinate tuples.
-    """
-
-    # Check whether both latitudes and longitudes have been passed,
-    # or if the list lenghts don't match
-    if (latitudes is None or longitudes is None) or (len(latitudes) != len(longitudes)):
-        # Otherwise, return the default values of 0 zoom and the coordinate origin as center point
-        return 0, (0, 0)
-
-    # Get the boundary-box
-    b_box = {}
-    b_box["height"] = latitudes.max() - latitudes.min()
-    b_box["width"] = longitudes.max() - longitudes.min()
-    b_box["center"] = (np.mean(longitudes), np.mean(latitudes))
-
-    # get the area of the bounding box in order to calculate a zoom-level
-    area = b_box["height"] * b_box["width"]
-
-    # * 1D-linear interpolation with numpy:
-    # - Pass the area as the only x-value and not as a list, in order to return a scalar as well
-    # - The x-points "xp" should be in parts in comparable order of magnitude of the given area
-    # - The zpom-levels are adapted to the areas, i.e. start with the smallest area possible of 0
-    # which leads to the highest possible zoom value 20, and so forth decreasing with increasing areas
-    # as these variables are antiproportional
-    zoom = np.interp(
-        x=area,
-        xp=[0, 5**-10, 4**-10, 3**-10, 2**-10, 1**-10, 1**-5],
-        fp=[20, 15, 14, 13, 12, 7, 5],
-    )
-
-    # Finally, return the zoom level and the associated boundary-box center coordinates
-    return zoom, b_box["center"]
-
-
-def show_project_map(project_name):
-    prepared_statement = con.execute(
-        "SELECT geometry FROM project WHERE name = ? LIMIT 1", [project_name]
-    ).fetchall()
-    features = json.loads(prepared_statement[0][0].replace("'", '"'))["features"]
-    geometry = features[0]["geometry"]
-    longitudes = np.array(geometry["coordinates"])[0, :, 0]
-    latitudes = np.array(geometry["coordinates"])[0, :, 1]
-    (
-        zoom,
-        bbox_center,
-    ) = get_plotting_zoom_level_and_center_coordinates_from_lonlat_tuples(
-        longitudes, latitudes
-    )
-    fig = go.Figure(
-        go.Scattermapbox(
-            mode="markers",
-            lon=[bbox_center[0]],
-            lat=[bbox_center[1]],
-            marker={"size": 20, "color": ["cyan"]},
-        )
-    )
-
-    fig.update_layout(
-        mapbox={
-            "style": "stamen-terrain",
-            "center": {"lon": bbox_center[0], "lat": bbox_center[1]},
-            "zoom": zoom,
-            "layers": [
-                {
-                    "source": {
-                        "type": "FeatureCollection",
-                        "features": [{"type": "Feature", "geometry": geometry}],
-                    },
-                    "type": "fill",
-                    "below": "traces",
-                    "color": "royalblue",
-                }
-            ],
-        },
-        margin={"l": 0, "r": 0, "b": 0, "t": 0},
-    )
-
-    return fig
-
-
-# minMax.getInfo()
-def calculate_biodiversity_score(start_year, end_year, project_name):
-    years = []
-    for year in range(start_year, end_year):
-        row_exists = con.execute(
-            "SELECT COUNT(1) FROM bioindicator WHERE (year = ? AND project_name = ?)",
-            [year, project_name],
-        ).fetchall()[0][0]
-        if not row_exists:
-            years.append(year)
-
-    if len(years) > 0:
-        df = create_dataframe(years, project_name)
-
-        # Write score table to `_temptable`
-        con.sql(
-            "CREATE OR REPLACE TABLE _temptable AS SELECT *, (value * area) AS score FROM (SELECT year, project_name, AVG(value) AS value, area  FROM df GROUP BY year, project_name, area ORDER BY project_name)"
-        )
-
-        # Create `bioindicator` table IF NOT EXISTS.
-        con.sql(
-            """
-            USE climatebase;
-            CREATE TABLE IF NOT EXISTS bioindicator (year BIGINT, project_name VARCHAR(255), value DOUBLE, area DOUBLE, score DOUBLE, CONSTRAINT unique_year_project_name UNIQUE (year, project_name));
+    @staticmethod
+    def _authenticate_ee(ee_service_account):
         """
-        )
-        # UPSERT project record
-        con.sql(
-            """
-            INSERT INTO bioindicator FROM _temptable
-            ON CONFLICT (year, project_name) DO UPDATE SET value = excluded.value;
+        Huggingface Spaces does not support secret files, therefore authenticate with an environment variable containing the JSON.
         """
+        logging.info("Authenticating to Google Earth Engine...")
+        credentials = ee.ServiceAccountCredentials(
+            ee_service_account, key_data=os.environ["ee_service_account"]
         )
-        logging.info("upsert records into motherduck")
-    scores = con.execute(
-        "SELECT * FROM bioindicator WHERE (year >= ? AND year <= ? AND project_name = ?)",
-        [start_year, end_year, project_name],
-    ).df()
-    return scores
+        ee.Initialize(credentials)
+        logging.info("Authenticated to Google Earth Engine.")
+
+    def _create_dataframe(self, years, project_name):
+        dfs = []
+        logging.info(years)
+        indices = self._load_indices(INDICES_FILE)
+        for year in years:
+            logging.info(year)
+            ig = IndexGenerator(
+                centroid=LOCATION,
+                roi_radius=ROI_RADIUS,
+                year=year,
+                indices_file=INDICES_FILE,
+                project_name=project_name,
+            )
+            df = ig.generate_composite_index_df(list(indices.keys()))
+            dfs.append(df)
+        return pd.concat(dfs)
+
+    # h/t: https://community.plotly.com/t/dynamic-zoom-for-mapbox/32658/12
+    def _latlon_to_config(
+        self,
+        longitudes=None, 
+        latitudes=None
+    ):
+        """Function documentation:\n
+        Basic framework adopted from Krichardson under the following thread:
+        https://community.plotly.com/t/dynamic-zoom-for-mapbox/32658/7
+
+        # NOTE:
+        # THIS IS A TEMPORARY SOLUTION UNTIL THE DASH TEAM IMPLEMENTS DYNAMIC ZOOM
+        # in their plotly-functions associated with mapbox, such as go.Densitymapbox() etc.
+
+        Returns the appropriate zoom-level for these plotly-mapbox-graphics along with
+        the center coordinate tuple of all provided coordinate tuples.
+        """
+
+        # Check whether both latitudes and longitudes have been passed,
+        # or if the list lenghts don't match
+        if (latitudes is None or longitudes is None) or (
+            len(latitudes) != len(longitudes)
+        ):
+            # Otherwise, return the default values of 0 zoom and the coordinate origin as center point
+            return 0, (0, 0)
+
+        # Get the boundary-box
+        b_box = {}
+        b_box["height"] = latitudes.max() - latitudes.min()
+        b_box["width"] = longitudes.max() - longitudes.min()
+        b_box["center"] = (np.mean(longitudes), np.mean(latitudes))
+
+        # get the area of the bounding box in order to calculate a zoom-level
+        area = b_box["height"] * b_box["width"]
+
+        # * 1D-linear interpolation with numpy:
+        # - Pass the area as the only x-value and not as a list, in order to return a scalar as well
+        # - The x-points "xp" should be in parts in comparable order of magnitude of the given area
+        # - The zpom-levels are adapted to the areas, i.e. start with the smallest area possible of 0
+        # which leads to the highest possible zoom value 20, and so forth decreasing with increasing areas
+        # as these variables are antiproportional
+        zoom = np.interp(
+            x=area,
+            xp=[0, 5**-10, 4**-10, 3**-10, 2**-10, 1**-10, 1**-5],
+            fp=[20, 15, 14, 13, 12, 7, 5],
+        )
+
+        # Finally, return the zoom level and the associated boundary-box center coordinates
+        return zoom, b_box["center"]
+
+    def show_project_map(self, project_name):
+        breakpoint()
+        prepared_statement = get_project_geometry(project_name)
+            # self.con.execute("SELECT geometry FROM project WHERE name = ? LIMIT 1", [project_name]).fetchall()
+        features = json.loads(prepared_statement[0][0].replace("'", '"'))["features"]
+        geometry = features[0]["geometry"]
+        longitudes = np.array(geometry["coordinates"])[0, :, 0]
+        latitudes = np.array(geometry["coordinates"])[0, :, 1]
+        zoom, bbox_center = self._latlon_to_config(longitudes, latitudes)
+        fig = go.Figure(
+            go.Scattermapbox(
+                mode="markers",
+                lon=[bbox_center[0]],
+                lat=[bbox_center[1]],
+                marker={"size": 20, "color": ["cyan"]},
+            )
+        )
+
+        fig.update_layout(
+            mapbox={
+                "style": "stamen-terrain",
+                "center": {"lon": bbox_center[0], "lat": bbox_center[1]},
+                "zoom": zoom,
+                "layers": [
+                    {
+                        "source": {
+                            "type": "FeatureCollection",
+                            "features": [{"type": "Feature", "geometry": geometry}],
+                        },
+                        "type": "fill",
+                        "below": "traces",
+                        "color": "royalblue",
+                    }
+                ],
+            },
+            margin={"l": 0, "r": 0, "b": 0, "t": 0},
+        )
+
+        return fig
+
+    def calculate_biodiversity_score(self, start_year, end_year, project_name):
+        years = []
+        for year in range(start_year, end_year):
+            row_exists = con.execute(
+                "SELECT COUNT(1) FROM bioindicator WHERE (year = ? AND project_name = ?)",
+                [year, project_name],
+            ).fetchall()[0][0]
+            if not row_exists:
+                years.append(year)
+
+        if len(years) > 0:
+            df = self._create_dataframe(years, project_name)
+
+            # Write score table to `_temptable`
+            self.con.sql(
+                "CREATE OR REPLACE TABLE _temptable AS SELECT *, (value * area) AS score FROM (SELECT year, project_name, AVG(value) AS value, area  FROM df GROUP BY year, project_name, area ORDER BY project_name)"
+            )
+
+            # Create `bioindicator` table IF NOT EXISTS.
+            self.con.sql(
+                """
+                USE climatebase;
+                CREATE TABLE IF NOT EXISTS bioindicator (year BIGINT, project_name VARCHAR(255), value DOUBLE, area DOUBLE, score DOUBLE, CONSTRAINT unique_year_project_name UNIQUE (year, project_name));
+            """
+            )
+            # UPSERT project record
+            self.con.sql(
+                """
+                INSERT INTO bioindicator FROM _temptable
+                ON CONFLICT (year, project_name) DO UPDATE SET value = excluded.value;
+            """
+            )
+            logging.info("upsert records into motherduck")
+        scores = self.con.execute(
+            "SELECT * FROM bioindicator WHERE (year >= ? AND year <= ? AND project_name = ?)",
+            [start_year, end_year, project_name],
+        ).df()
+        return scores
 
 
-def motherduck_list_projects(author_id):
-    return con.execute(
-        "SELECT DISTINCT name FROM project WHERE authorId = ? AND geometry != 'null'",
-        [author_id],
-    ).df()
-
+# Instantiate outside gradio app to avoid re-initializing GEE, which is slow
+indexgenerator = IndexGenerator(
+    centroid=LOCATION,
+    roi_radius=ROI_RADIUS,
+    indices_file=INDICES_FILE,
+)
 
 with gr.Blocks() as demo:
-    # Environment setup
-    authenticate_ee(GEE_SERVICE_ACCOUNT)
-    con = set_up_duckdb()
+    print("start gradio app")
+
+
+
     with gr.Column():
         m1 = gr.Plot()
         with gr.Row():
@@ -402,19 +396,19 @@ with gr.Blocks() as demo:
             label="Biodiversity scores by year",
         )
     calc_btn.click(
-        calculate_biodiversity_score,
+        indexgenerator.calculate_biodiversity_score,
         inputs=[start_year, end_year, project_name],
         outputs=results_df,
     )
     view_btn.click(
-        fn=show_project_map,
+        fn=indexgenerator.show_project_map,
         inputs=[project_name],
         outputs=[m1],
     )
 
     def update_project_dropdown_list(url_params):
         username = url_params.get("username", "default")
-        projects = motherduck_list_projects(author_id=username)
+        projects = list_projects_by_author(author_id=username)
         # to-do: filter projects based on user
         return gr.Dropdown.update(choices=projects["name"].tolist())
 
