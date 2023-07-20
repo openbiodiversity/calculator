@@ -5,8 +5,6 @@ from utils.gradio import get_window_url_params
 from utils.indicators import IndexGenerator
 
 # Define constants
-DATE = "2020-01-01"
-YEAR = 2020
 LOCATION = [-74.653370, 5.845328]
 ROI_RADIUS = 20000
 INDICES_FILE = "indices.yaml"
