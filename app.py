@@ -5,7 +5,7 @@ from utils.gradio import get_window_url_params
 from utils.indicators import IndexGenerator
 
 # Instantiate outside gradio app to avoid re-initializing GEE, which is slow
-indexgenerator = IndexGenerator()
+indexgenerator = IndexGenerator(indices=['NDWI','Water','Protected','Air'])
 
 with gr.Blocks() as demo:
     with gr.Column():

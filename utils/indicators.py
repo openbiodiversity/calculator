@@ -27,12 +27,14 @@ class IndexGenerator:
 
     def __init__(
         self,
+        indices,
     ):
         # Authenticate to GEE & DuckDB
         self._authenticate_ee(GEE_SERVICE_ACCOUNT)
 
         # Set instance variables
         self.indices = self._load_indices(INDICES_FILE)
+        breakpoint()
 
 
     def _cloudfree(self, gee_path, daterange):
