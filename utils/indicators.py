@@ -126,16 +126,22 @@ class IndexGenerator:
     def zonal_mean_index(self, index_key, year):
         index_config = self.indices[index_key]
         dataset = self.generate_index(index_config, year)
-        # zm = self._zonal_mean(single, index_config.get('bandname') or 'constant')
+
+        logging.info(f"Calculating zonal mean for {index_key}...")
         out = dataset.reduceRegion(
             **{
                 "reducer": ee.Reducer.mean(),
                 "geometry": self.roi,
-                "scale": 200,  # map scale
+                "scale": 2000,  # map scale
+                "bestEffort": True,
+                "maxPixels": 1e3,
             }
         ).getInfo()
+
         if index_config.get("bandname"):
             return out[index_config.get("bandname")]
+        
+        logging.info(f"Calculated zonal mean for {index_key}.")
         return out
 
     def generate_composite_index_df(self, year, project_geometry, indices=[]):
@@ -145,7 +151,8 @@ class IndexGenerator:
             "centroid": "",
             "project_name": "",
             "value": list(map(self.zonal_mean_index, indices, repeat(year))),
-            "area": self.roi.area().getInfo(),  # m^2 to-do: calculate with duckdb
+            # to-do: calculate with duckdb; also, should be part of project table instead
+            "area": self.roi.area().getInfo(),  # m^2 
             "geojson": "",
             # to-do: coefficient
         }
@@ -189,10 +196,9 @@ class IndexGenerator:
 
         # Concatenate all dataframes
         df_concat = pd.concat(dfs)
-        df_concat["centroid"] = project_centroid
+        df_concat["centroid"] = str(project_centroid)
         df_concat["project_name"] = project_name
-        df_concat["geojson"] = project_geometry
-        breakpoint()
+        df_concat["geojson"] = str(project_geometry)
         return df_concat
 
     # h/t: https://community.plotly.com/t/dynamic-zoom-for-mapbox/32658/12
