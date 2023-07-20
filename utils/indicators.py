@@ -13,9 +13,9 @@ from utils import duckdb_queries as dq
 
 from . import logging
 
-GEE_SERVICE_ACCOUNT = (
-    "climatebase-july-2023@ee-geospatialml-aquarry.iam.gserviceaccount.com"
-)
+GEE_SERVICE_ACCOUNT = "climatebase-july-2023@ee-geospatialml-aquarry.iam.gserviceaccount.com"
+ROI_RADIUS = 20000
+INDICES_FILE = "indices.yaml"
 
 
 class IndexGenerator:
@@ -32,8 +32,6 @@ class IndexGenerator:
 
     def __init__(
         self,
-        centroid,
-        roi_radius,
         indices_file,
         map=None,
     ):
@@ -42,9 +40,6 @@ class IndexGenerator:
 
         # Set instance variables
         self.indices = self._load_indices(indices_file)
-        self.centroid = centroid
-        self.roi = ee.Geometry.Point(*centroid).buffer(roi_radius)
-        # self.project_name = project_name
         self.map = map
         if self.map is not None:
             self.show = True
@@ -158,7 +153,7 @@ class IndexGenerator:
         data = {
             "metric": indices,
             "year": year,
-            "centroid": str(self.centroid),
+            "centroid": str(self.centroid), # to-do: self.roi.centroid().getInfo()
             "project_name": self.project_name,
             "value": list(map(self.zonal_mean_index, indices, repeat(year))),
             "area": self.roi.area().getInfo(),  # m^2
@@ -297,3 +292,10 @@ class IndexGenerator:
             logging.info("upserted records into motherduck")
         scores = dq.get_project_scores(project_name, start_year, end_year)
         return scores
+
+
+# Instantiate outside gradio app to avoid re-initializing GEE, which is slow
+indexgenerator = IndexGenerator(
+    roi_radius=ROI_RADIUS,
+    indices_file=INDICES_FILE,
+)

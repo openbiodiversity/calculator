@@ -2,24 +2,10 @@ import gradio as gr
 
 from utils import duckdb_queries as dq
 from utils.gradio import get_window_url_params
-from utils.indicators import IndexGenerator
+from utils.indicators import indexgenerator
 
-# Define constants
-LOCATION = [-74.653370, 5.845328]
-ROI_RADIUS = 20000
-INDICES_FILE = "indices.yaml"
-
-
-# Instantiate outside gradio app to avoid re-initializing GEE, which is slow
-indexgenerator = IndexGenerator(
-    centroid=LOCATION,
-    roi_radius=ROI_RADIUS,
-    indices_file=INDICES_FILE,
-)
 
 with gr.Blocks() as demo:
-    print("start gradio app")
-
     with gr.Column():
         m1 = gr.Plot()
         with gr.Row():
@@ -49,7 +35,6 @@ with gr.Blocks() as demo:
     def update_project_dropdown_list(url_params):
         username = url_params.get("username", "default")
         projects = dq.list_projects_by_author(author_id=username)
-        # to-do: filter projects based on user
         return gr.Dropdown.update(choices=projects["name"].tolist())
 
     # Get url params
