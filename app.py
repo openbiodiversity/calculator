@@ -240,8 +240,11 @@ def create_dataframe(years, project_name):
         dfs.append(df)
     return pd.concat(dfs)
 
+
 # h/t: https://community.plotly.com/t/dynamic-zoom-for-mapbox/32658/12
-def get_plotting_zoom_level_and_center_coordinates_from_lonlat_tuples(longitudes=None, latitudes=None):
+def get_plotting_zoom_level_and_center_coordinates_from_lonlat_tuples(
+    longitudes=None, latitudes=None
+):
     """Function documentation:\n
     Basic framework adopted from Krichardson under the following thread:
     https://community.plotly.com/t/dynamic-zoom-for-mapbox/32658/7
@@ -256,19 +259,18 @@ def get_plotting_zoom_level_and_center_coordinates_from_lonlat_tuples(longitudes
 
     # Check whether both latitudes and longitudes have been passed,
     # or if the list lenghts don't match
-    if ((latitudes is None or longitudes is None)
-            or (len(latitudes) != len(longitudes))):
+    if (latitudes is None or longitudes is None) or (len(latitudes) != len(longitudes)):
         # Otherwise, return the default values of 0 zoom and the coordinate origin as center point
         return 0, (0, 0)
 
-    # Get the boundary-box 
-    b_box = {} 
-    b_box['height'] = latitudes.max()-latitudes.min()
-    b_box['width'] = longitudes.max()-longitudes.min()
-    b_box['center']= (np.mean(longitudes), np.mean(latitudes))
+    # Get the boundary-box
+    b_box = {}
+    b_box["height"] = latitudes.max() - latitudes.min()
+    b_box["width"] = longitudes.max() - longitudes.min()
+    b_box["center"] = (np.mean(longitudes), np.mean(latitudes))
 
     # get the area of the bounding box in order to calculate a zoom-level
-    area = b_box['height'] * b_box['width']
+    area = b_box["height"] * b_box["width"]
 
     # * 1D-linear interpolation with numpy:
     # - Pass the area as the only x-value and not as a list, in order to return a scalar as well
@@ -276,52 +278,70 @@ def get_plotting_zoom_level_and_center_coordinates_from_lonlat_tuples(longitudes
     # - The zpom-levels are adapted to the areas, i.e. start with the smallest area possible of 0
     # which leads to the highest possible zoom value 20, and so forth decreasing with increasing areas
     # as these variables are antiproportional
-    zoom = np.interp(x=area,
-                     xp=[0, 5**-10, 4**-10, 3**-10, 2**-10, 1**-10, 1**-5],
-                     fp=[20, 15,    14,     13,     12,     7,      5])
+    zoom = np.interp(
+        x=area,
+        xp=[0, 5**-10, 4**-10, 3**-10, 2**-10, 1**-10, 1**-5],
+        fp=[20, 15, 14, 13, 12, 7, 5],
+    )
 
     # Finally, return the zoom level and the associated boundary-box center coordinates
-    return zoom, b_box['center']
+    return zoom, b_box["center"]
+
 
 def show_project_map(project_name):
-    prepared_statement = \
-        con.execute("SELECT geometry FROM project WHERE name = ? LIMIT 1",
-                    [project_name]).fetchall()
-    features = \
-        json.loads(prepared_statement[0][0].replace("\'", "\""))['features']
-    geometry = features[0]['geometry']
+    prepared_statement = con.execute(
+        "SELECT geometry FROM project WHERE name = ? LIMIT 1", [project_name]
+    ).fetchall()
+    features = json.loads(prepared_statement[0][0].replace("'", '"'))["features"]
+    geometry = features[0]["geometry"]
     longitudes = np.array(geometry["coordinates"])[0, :, 0]
     latitudes = np.array(geometry["coordinates"])[0, :, 1]
-    zoom, bbox_center = get_plotting_zoom_level_and_center_coordinates_from_lonlat_tuples(longitudes, latitudes)
-    fig = go.Figure(go.Scattermapbox(
-        mode = "markers",
-        lon = [bbox_center[0]], lat = [bbox_center[1]],
-        marker = {'size': 20, 'color': ["cyan"]}))
+    (
+        zoom,
+        bbox_center,
+    ) = get_plotting_zoom_level_and_center_coordinates_from_lonlat_tuples(
+        longitudes, latitudes
+    )
+    fig = go.Figure(
+        go.Scattermapbox(
+            mode="markers",
+            lon=[bbox_center[0]],
+            lat=[bbox_center[1]],
+            marker={"size": 20, "color": ["cyan"]},
+        )
+    )
 
     fig.update_layout(
-        mapbox = {
-            'style': "stamen-terrain",
-            'center': { 'lon': bbox_center[0], 'lat': bbox_center[1]},
-            'zoom': zoom, 'layers': [{
-                'source': {
-                    'type': "FeatureCollection",
-                    'features': [{
-                        'type': "Feature",
-                        'geometry': geometry
-                    }]
-                },
-                'type': "fill", 'below': "traces", 'color': "royalblue"}]},
-        margin = {'l':0, 'r':0, 'b':0, 't':0})
-    
+        mapbox={
+            "style": "stamen-terrain",
+            "center": {"lon": bbox_center[0], "lat": bbox_center[1]},
+            "zoom": zoom,
+            "layers": [
+                {
+                    "source": {
+                        "type": "FeatureCollection",
+                        "features": [{"type": "Feature", "geometry": geometry}],
+                    },
+                    "type": "fill",
+                    "below": "traces",
+                    "color": "royalblue",
+                }
+            ],
+        },
+        margin={"l": 0, "r": 0, "b": 0, "t": 0},
+    )
+
     return fig
+
 
 # minMax.getInfo()
 def calculate_biodiversity_score(start_year, end_year, project_name):
     years = []
     for year in range(start_year, end_year):
-        row_exists = \
-            con.execute("SELECT COUNT(1) FROM bioindicator WHERE (year = ? AND project_name = ?)",
-                        [year, project_name]).fetchall()[0][0]
+        row_exists = con.execute(
+            "SELECT COUNT(1) FROM bioindicator WHERE (year = ? AND project_name = ?)",
+            [year, project_name],
+        ).fetchall()[0][0]
         if not row_exists:
             years.append(year)
 
@@ -338,7 +358,8 @@ def calculate_biodiversity_score(start_year, end_year, project_name):
             """
             USE climatebase;
             CREATE TABLE IF NOT EXISTS bioindicator (year BIGINT, project_name VARCHAR(255), value DOUBLE, area DOUBLE, score DOUBLE, CONSTRAINT unique_year_project_name UNIQUE (year, project_name));
-        """)
+        """
+        )
         # UPSERT project record
         con.sql(
             """
@@ -347,14 +368,18 @@ def calculate_biodiversity_score(start_year, end_year, project_name):
         """
         )
         logging.info("upsert records into motherduck")
-    scores = \
-        con.execute("SELECT * FROM bioindicator WHERE (year >= ? AND year <= ? AND project_name = ?)",
-                    [start_year, end_year, project_name]).df()
+    scores = con.execute(
+        "SELECT * FROM bioindicator WHERE (year >= ? AND year <= ? AND project_name = ?)",
+        [start_year, end_year, project_name],
+    ).df()
     return scores
 
+
 def motherduck_list_projects(author_id):
-    return \
-        con.execute("SELECT DISTINCT name FROM project WHERE authorId = ? AND geometry != 'null'", [author_id]).df()
+    return con.execute(
+        "SELECT DISTINCT name FROM project WHERE authorId = ? AND geometry != 'null'",
+        [author_id],
+    ).df()
 
 
 with gr.Blocks() as demo:
@@ -385,7 +410,7 @@ with gr.Blocks() as demo:
         fn=show_project_map,
         inputs=[project_name],
         outputs=[m1],
-        )
+    )
 
     def update_project_dropdown_list(url_params):
         username = url_params.get("username", "default")
