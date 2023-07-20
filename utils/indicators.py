@@ -201,7 +201,7 @@ class IndexGenerator:
         df_concat["centroid"] = str(project_centroid)
         df_concat["project_name"] = project_name
         df_concat["geojson"] = str(project_geometry)
-        return df_concat
+        return df_concat.round(2)
 
     # h/t: https://community.plotly.com/t/dynamic-zoom-for-mapbox/32658/12
     def _latlon_to_config(self, longitudes=None, latitudes=None):
