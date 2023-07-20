@@ -55,7 +55,7 @@ def check_if_project_exists_for_year(project_name, year):
 
 def write_score_to_temptable(df):
     con.sql(
-        "CREATE OR REPLACE TABLE _temptable AS SELECT *, (value * area) AS score FROM (SELECT year, project_name, AVG(value) AS value, area  FROM df GROUP BY year, project_name, area ORDER BY project_name)"
+        "CREATE OR REPLACE TABLE _temptable AS SELECT *, ROUND((value * area), 2) AS score FROM (SELECT year, project_name, ROUND(AVG(value), 2) AS value, area FROM df GROUP BY year, project_name, area ORDER BY project_name)"
     )
     return True
 
