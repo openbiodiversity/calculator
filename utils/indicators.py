@@ -24,7 +24,7 @@ class IndexGenerator:
     A class to generate indices and compute zonal means.
 
         Args:
-            map (geemap.Map, optional): Map object for mapping. Defaults to None (i.e. no map created)
+            indices (string[], required): Array of index names to include in aggregate index generation.
     """
 
     def __init__(
