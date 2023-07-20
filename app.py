@@ -2,19 +2,17 @@ import datetime
 import json
 import logging
 import os
+from itertools import repeat
 
-import duckdb
 import ee
 import gradio as gr
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import yaml
-import numpy as np
-from itertools import repeat
 
-
-from utils.gradio import get_window_url_params
 from utils import duckdb_queries as dq
+from utils.gradio import get_window_url_params
 
 # Logging
 logging.basicConfig(format="%(levelname)s:%(message)s", level=logging.INFO)
