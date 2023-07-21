@@ -22,22 +22,31 @@ with gr.Blocks() as demo:
             headers=["Year", "Project Name", "Score"],
             datatype=["number", "str", "number"],
             label="Biodiversity scores by year",
+            row_count=0,
         )
     calc_btn.click(
         indexgenerator.calculate_biodiversity_score,
-        inputs=[start_year, end_year, project_name],
+        inputs=[start_year, end_year],
         outputs=results_df,
     )
     view_btn.click(
         fn=indexgenerator.show_project_map,
-        inputs=[project_name],
         outputs=[m1],
     )
 
     def update_project_dropdown_list(url_params):
         username = url_params.get("username", "default")
         projects = dq.list_projects_by_author(author_id=username)
-        return gr.Dropdown.update(choices=projects["name"].tolist())
+        # Initialize the first project in the list
+        project_names = projects['name'].tolist()
+        return gr.Dropdown.update(choices=project_names)
+
+    # Change the project name in the index generator object when the
+    # user selects a new project
+    project_name.change(
+        indexgenerator.set_project,
+        inputs=project_name
+    )
 
     # Get url params
     url_params = gr.JSON({"username": "default"}, visible=False, label="URL Params")

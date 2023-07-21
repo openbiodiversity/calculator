@@ -18,7 +18,7 @@ else:
 # to-do: pass con through decorator
 def list_projects_by_author(author_id):
     return con.execute(
-        "SELECT DISTINCT name FROM project WHERE authorId = ? AND geometry != 'null'",
+        "SELECT DISTINCT name FROM project WHERE (authorId = ? OR authorId = 'default') AND (geometry IS NOT NULL)",
         [author_id],
     ).df()
 

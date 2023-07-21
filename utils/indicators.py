@@ -34,9 +34,25 @@ class IndexGenerator:
         # Authenticate to GEE & DuckDB
         self._authenticate_ee(GEE_SERVICE_ACCOUNT)
 
+        self.project_name = None
+        self.project_geometry = None
+        self.project_centroid = None
+        
         # Use defined subset of indices
         all_indices = self._load_indices(INDICES_FILE)
         self.indices = {k: all_indices[k] for k in indices}
+
+    def set_project(self, project_name):
+        self.project_name = project_name
+        self.project_geometry = dq.get_project_geometry(self.project_name)
+        self.project_centroid = dq.get_project_centroid(self.project_name)
+
+        # to-do: refactor to involve fewer transformations
+        _polygon = json.dumps(
+            json.loads(self.project_geometry[0][0])["features"][0]["geometry"]
+        )
+        # to-do: don't use self.roi and instead pass patameter strategically
+        self.roi = ee.Geometry.Polygon(json.loads(_polygon)["coordinates"])
 
     def _cloudfree(self, gee_path, daterange):
         """
@@ -146,7 +162,7 @@ class IndexGenerator:
         logging.info(f"Calculated zonal mean for {index_key}.")
         return out
 
-    def generate_composite_index_df(self, year, project_geometry, indices=[]):
+    def generate_composite_index_df(self, year, indices=[]):
         data = {
             "metric": indices,
             "year": year,
@@ -175,36 +191,28 @@ class IndexGenerator:
         ee.Initialize(credentials)
         logging.info("Authenticated to Google Earth Engine.")
 
-    def _calculate_yearly_index(self, years, project_name):
+    def _calculate_yearly_index(self, years):
         dfs = []
         logging.info(years)
-        project_geometry = dq.get_project_geometry(project_name)
-        project_centroid = dq.get_project_centroid(project_name)
-        # to-do: refactor to involve less transformations
-        _polygon = json.dumps(
-            json.loads(project_geometry[0][0])["features"][0]["geometry"]
-        )
-        # to-do: don't use self.roi and instead pass patameter strategically
-        self.roi = ee.Geometry.Polygon(json.loads(_polygon)["coordinates"])
 
         # to-do: pararelize?
         for year in years:
             logging.info(year)
-            self.project_name = project_name
             df = self.generate_composite_index_df(
-                year, project_geometry, list(self.indices.keys())
+                year, self.project_geometry, list(self.indices.keys())
             )
             dfs.append(df)
 
         # Concatenate all dataframes
         df_concat = pd.concat(dfs)
-        df_concat["centroid"] = str(project_centroid)
-        df_concat["project_name"] = project_name
-        df_concat["geojson"] = str(project_geometry)
+        df_concat["centroid"] = str(self.project_centroid)
+        df_concat["project_name"] = self.project_name
+        df_concat["geojson"] = str(self.project_geometry)
         return df_concat.round(2)
 
-    # h/t: https://community.plotly.com/t/dynamic-zoom-for-mapbox/32658/12
-    def _latlon_to_config(self, longitudes=None, latitudes=None):
+    # h/t: https://community.plotly.com/t/dynamic-zoom-for-mapbox/32658/12\
+    @staticmethod
+    def _latlon_to_config(longitudes=None, latitudes=None):
         """Function documentation:\n
         Basic framework adopted from Krichardson under the following thread:
         https://community.plotly.com/t/dynamic-zoom-for-mapbox/32658/7
@@ -249,9 +257,8 @@ class IndexGenerator:
         # Finally, return the zoom level and the associated boundary-box center coordinates
         return zoom, b_box["center"]
 
-    def show_project_map(self, project_name):
-        project_geometry = dq.get_project_geometry(project_name)
-        features = json.loads(project_geometry[0][0].replace("'", '"'))["features"]
+    def show_project_map(self):
+        features = json.loads(self.project_geometry[0][0].replace("'", '"'))["features"]
         geometry = features[0]["geometry"]
         longitudes = np.array(geometry["coordinates"])[0, :, 0]
         latitudes = np.array(geometry["coordinates"])[0, :, 1]
@@ -287,15 +294,15 @@ class IndexGenerator:
 
         return fig
 
-    def calculate_biodiversity_score(self, start_year, end_year, project_name):
+    def calculate_biodiversity_score(self, start_year, end_year):
         years = []
         for year in range(start_year, end_year):
-            row_exists = dq.check_if_project_exists_for_year(project_name, year)
+            row_exists = dq.check_if_project_exists_for_year(self.project_name, year)
             if not row_exists:
                 years.append(year)
 
         if len(years) > 0:
-            df = self._calculate_yearly_index(years, project_name)
+            df = self._calculate_yearly_index(years)
 
             # Write score table to `_temptable`
             dq.write_score_to_temptable(df)
@@ -306,5 +313,5 @@ class IndexGenerator:
             # UPSERT project record
             dq.upsert_project_record()
             logging.info("upserted records into motherduck")
-        scores = dq.get_project_scores(project_name, start_year, end_year)
+        scores = dq.get_project_scores(self.project_name, start_year, end_year)
         return scores
