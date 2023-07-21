@@ -294,7 +294,7 @@ class IndexGenerator:
 
         return fig
 
-    def calculate_biodiversity_score(self, start_year, end_year):
+    def calculate_score(self, start_year, end_year):
         years = []
         for year in range(start_year, end_year):
             row_exists = dq.check_if_project_exists_for_year(self.project_name, year)

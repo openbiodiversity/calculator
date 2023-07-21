@@ -17,15 +17,13 @@ with gr.Blocks() as demo:
         with gr.Row():
             view_btn = gr.Button(value="Show project map")
             calc_btn = gr.Button(value="Calculate!")
-            # save_btn = gr.Button(value="Save")
         results_df = gr.Dataframe(
             headers=["Year", "Project Name", "Score"],
             datatype=["number", "str", "number"],
-            label="Biodiversity scores by year",
-            row_count=0,
+            label="Scores by year",
         )
     calc_btn.click(
-        indexgenerator.calculate_biodiversity_score,
+        indexgenerator.calculate_score,
         inputs=[start_year, end_year],
         outputs=results_df,
     )
