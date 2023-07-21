@@ -75,7 +75,8 @@ class IndexGenerator:
         )
         return composite_cloudfree.clip(self.roi)
 
-    def _load_indices(self, indices_file):
+    @staticmethod
+    def _load_indices(indices_file):
         # Read index configurations
         with open(indices_file, "r") as stream:
             try:
