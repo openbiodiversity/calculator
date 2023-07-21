@@ -275,7 +275,8 @@ class IndexGenerator:
 
         fig.update_layout(
             mapbox={
-                "style": "stamen-terrain",
+                "style": "satellite",
+                "accesstoken":os.environ['MAPBOX_ACCESS_TOKEN'],
                 "center": {"lon": bbox_center[0], "lat": bbox_center[1]},
                 "zoom": zoom,
                 "layers": [
@@ -287,6 +288,7 @@ class IndexGenerator:
                         "type": "fill",
                         "below": "traces",
                         "color": "royalblue",
+                        "opacity": 0.5,
                     }
                 ],
             },
