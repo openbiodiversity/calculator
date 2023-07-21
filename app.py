@@ -37,7 +37,8 @@ with gr.Blocks() as demo:
         projects = dq.list_projects_by_author(author_id=username)
         # Initialize the first project in the list
         project_names = projects['name'].tolist()
-        return gr.Dropdown.update(choices=project_names)
+        default_project = project_names[0]
+        return gr.Dropdown.update(choices=project_names, value=default_project)
 
     # Change the project name in the index generator object when the
     # user selects a new project
