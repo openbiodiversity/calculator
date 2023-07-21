@@ -276,7 +276,7 @@ class IndexGenerator:
         fig.update_layout(
             mapbox={
                 "style": "satellite",
-                "accesstoken":os.environ['NEXT_PUBLIC_MAPBOX_API'],
+                "accesstoken":os.environ['MAPBOX_ACCESS_TOKEN'],
                 "center": {"lon": bbox_center[0], "lat": bbox_center[1]},
                 "zoom": zoom,
                 "layers": [
