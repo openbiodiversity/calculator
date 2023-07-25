@@ -16,8 +16,6 @@ from . import logging
 GEE_SERVICE_ACCOUNT = (
     "climatebase-july-2023@ee-geospatialml-aquarry.iam.gserviceaccount.com"
 )
-INDICES_FILE = "indices.yaml"
-
 
 class IndexGenerator:
     """
@@ -27,20 +25,22 @@ class IndexGenerator:
             indices (string[], required): Array of index names to include in aggregate index generation.
     """
 
-    def __init__(
-        self,
-        indices,
-    ):
+    def __init__(self):
         # Authenticate to GEE & DuckDB
         self._authenticate_ee(GEE_SERVICE_ACCOUNT)
 
+        self.roi = None
         self.project_name = None
         self.project_geometry = None
         self.project_centroid = None
-        
+        self.indices = None
+        self.metric_name = None
+
+    def set_metric(self, metric_name):        
         # Use defined subset of indices
-        all_indices = self._load_indices(INDICES_FILE)
-        self.indices = {k: all_indices[k] for k in indices}
+        indices_file = f'metrics/{metric_name.replace(" ", "_")}.yaml'
+        self.indices = self._load_indices(indices_file)
+        self.metric_name = metric_name
 
     def set_project(self, project_name):
         self.project_name = project_name
@@ -139,6 +139,18 @@ class IndexGenerator:
         if not dataset:
             raise Exception("Failed to generate dataset.")
 
+        # Normalize to a range of [0, 1]
+        min_val = 0
+        max_val = 1
+        if type(index_config['min'])==int or type(index_config['min']==float):
+            min_val = index_config['min']
+        if str(index_config['max'])=='roi_area':
+            max_val = self.roi.area().getInfo() # in m^2
+        elif type(index_config['max'])==int or type(index_config['max']==float):
+            max_val = index_config['max']
+        dataset.subtract(min_val)\
+            .divide(max_val - min_val)
+
         logging.info(f"Generated index: {index_config['name']}")
         return dataset
 
@@ -163,17 +175,17 @@ class IndexGenerator:
         logging.info(f"Calculated zonal mean for {index_key}.")
         return out
 
-    def generate_composite_index_df(self, year, indices=[]):
+    def generate_composite_index_df(self, year):
         data = {
-            "metric": indices,
+            "metric": self.metric_name,
             "year": year,
             "centroid": "",
             "project_name": "",
-            "value": list(map(self.zonal_mean_index, indices, repeat(year))),
+            "value": list(map(self.zonal_mean_index, self.indices, repeat(year))),
             # to-do: calculate with duckdb; also, should be part of project table instead
             "area": self.roi.area().getInfo(),  # m^2
             "geojson": "",
-            # to-do: coefficient
+            "coefficient": list(map(lambda x: self.indices[x]['coefficient'], self.indices))
         }
 
         logging.info("data", data)
@@ -199,9 +211,7 @@ class IndexGenerator:
         # to-do: pararelize?
         for year in years:
             logging.info(year)
-            df = self.generate_composite_index_df(
-                year, self.project_geometry, list(self.indices.keys())
-            )
+            df = self.generate_composite_index_df(year)
             dfs.append(df)
 
         # Concatenate all dataframes
@@ -299,7 +309,9 @@ class IndexGenerator:
 
     def calculate_score(self, start_year, end_year):
         years = []
-        for year in range(start_year, end_year):
+        # Create `bioindicator` table IF NOT EXISTS.
+        dq.get_or_create_bioindicator_table()
+        for year in range(start_year, end_year+1):
             row_exists = dq.check_if_project_exists_for_year(self.project_name, year)
             if not row_exists:
                 years.append(year)
@@ -310,11 +322,20 @@ class IndexGenerator:
             # Write score table to `_temptable`
             dq.write_score_to_temptable(df)
 
-            # Create `bioindicator` table IF NOT EXISTS.
-            dq.get_or_create_bioindicator_table()
-
             # UPSERT project record
             dq.upsert_project_record()
             logging.info("upserted records into motherduck")
         scores = dq.get_project_scores(self.project_name, start_year, end_year)
+        scores.columns = scores.columns.str.replace('_', ' ').str.title()
+        if 'Area' in scores.columns:
+            scores['Area'] /= 1000**2
+            scores.rename(columns={'Area':'Area (km^2)'}, inplace=True)
+        if 'Score' in scores.columns:
+            scores['Score'] /= 1000**2
+            scores.rename(columns={'Score': 'Score (Area * Value)'}, inplace=True)
+        # Round scores to 4 significant figures
+        scores = scores.apply(
+            lambda x: ['%.4g'%x_i for x_i in x]
+                if pd.api.types.is_numeric_dtype(x)
+                else x)
         return scores
