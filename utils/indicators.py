@@ -339,3 +339,9 @@ class IndexGenerator:
                 if pd.api.types.is_numeric_dtype(x)
                 else x)
         return scores
+
+    def get_metric_file(self):
+        # Use defined subset of indices
+        indices_file = f'metrics/{self.metric_name.replace(" ", "_")}.yaml'
+        with open(indices_file, "r") as stream:
+            return stream.read()

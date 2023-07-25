@@ -12,6 +12,12 @@ metric_names = os.listdir('metrics')
 for i in range(len(metric_names)):
     metric_names[i] = metric_names[i].split('.yaml')[0].replace('_', ' ')
 
+def toggle_metric_definition_box(text_input):
+    if text_input is None or text_input == '':
+        return indexgenerator.get_metric_file()
+    else:
+        return None
+    
 with gr.Blocks() as demo:
     with gr.Column():
         m1 = gr.Plot()
@@ -22,7 +28,11 @@ with gr.Blocks() as demo:
             end_year = gr.Number(value=2022, label="End Year", precision=0)
         with gr.Row():
             view_btn = gr.Button(value="Show project map")
-            calc_btn = gr.Button(value="Calculate!")
+            calc_btn = gr.Button(value="Calculate metric")
+            metric_btn = gr.Button(value='Show/hide metric definition')
+        metric_docs = gr.Textbox(
+            label="The chosen metric is a linear combination of these components normalized to a range of 0 to 1 and with the given coefficients",
+            interactive=False)
         results_df = gr.Dataframe(
             headers=["Year", "Project Name", "Score"],
             datatype=["number", "str", "number"],
@@ -56,6 +66,12 @@ with gr.Blocks() as demo:
     metric.change(
         indexgenerator.set_metric,
         inputs=metric
+    )
+    # Toggle display of metric information
+    metric_btn.click(
+        toggle_metric_definition_box,
+        inputs=metric_docs,
+        outputs=metric_docs
     )
 
     # Get url params
