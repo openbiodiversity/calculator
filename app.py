@@ -1,5 +1,6 @@
 import os
 import gradio as gr
+import plotly.express as px
 
 from utils import duckdb_queries as dq
 from utils.gradio import get_window_url_params
@@ -17,10 +18,15 @@ def toggle_metric_definition_box(text_input):
         return indexgenerator.get_metric_file()
     else:
         return None
-    
+
+def make_timeseries_plot(df):
+    return px.line(df, x='Year', y='Score (Area * Value)', markers=True)
+
 with gr.Blocks() as demo:
     with gr.Column():
-        m1 = gr.Plot()
+        with gr.Row():
+            m1 = gr.Plot(label='Project Map')
+            ts_plot = gr.Plot(label='Metric scores over time')
         with gr.Row():
             project_name = gr.Dropdown([], label="Project", value="Select project")
             metric = gr.Dropdown(metric_names, label='Metric', value='Select metric')
@@ -42,6 +48,10 @@ with gr.Blocks() as demo:
         indexgenerator.calculate_score,
         inputs=[start_year, end_year],
         outputs=results_df,
+    ).then(
+        make_timeseries_plot,
+        inputs=results_df,
+        outputs=ts_plot
     )
     view_btn.click(
         fn=indexgenerator.show_project_map,
@@ -67,6 +77,7 @@ with gr.Blocks() as demo:
         indexgenerator.set_metric,
         inputs=metric
     )
+
     # Toggle display of metric information
     metric_btn.click(
         toggle_metric_definition_box,
