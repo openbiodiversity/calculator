@@ -1,6 +1,10 @@
 ---
 Water:
   name: Water
+  description: The percent of a given area covered with water.
+  unit: percentage
+  min: 0
+  max: 100
   roi: ''
   gee_path: JRC/GSW1_1/GlobalSurfaceWater
   gee_type: image
@@ -13,9 +17,14 @@ Water:
     - 0000ff
   bandname: occurrence
   select: occurrence
+  coefficient: 1
   show: true
 Protected:
   name: Protected
+  description: The total PA extent, including both marine (if applicable) and terrestrial areas provided by data provider as specified in the legal text for the site.
+  unit: km^2
+  min: 0
+  max: roi_area
   roi: ''
   gee_path: WCMC/WDPA/current/polygons
   gee_type: feature_collection
@@ -32,9 +41,14 @@ Protected:
     opacity: 0.8
   select: REP_AREA
   bandname: constant
+  coefficient: 1
   show: true
 Air:
   name: Air
+  description: A measure of the prevalence of aerosols in the atmosphere.
+  unit: index (continuous)
+  min: -21
+  max: 39
   roi: ''
   gee_path: COPERNICUS/S5P/OFFL/L3_AER_AI
   gee_type: image_collection
@@ -52,15 +66,20 @@ Air:
   bandname: absorbing_aerosol_index
   select: absorbing_aerosol_index
   dates: false
+  coefficient: 1
   show: false
 Soil:
   name: Soil
+  description: An estimate of soil organic carbon content at b{n} cm depth.
+  unit: 5g/kg
+  min: 0
+  max: 120
   roi: ''
   gee_path: OpenLandMap/SOL/SOL_ORGANIC-CARBON_USDA-6A1C_M/v02
   gee_type: image
   viz:
     bands:
-    - b200
+    - b0
     min: 0
     max: 12
     palette:
@@ -77,9 +96,14 @@ Soil:
     - 00120b
   select: b0
   bandname: b0
+  coefficient: 1
   show: false
 Temperature:
   name: Temperature
+  description: Average Daytime Land Surface Temperature
+  unit: 0.02 K
+  min: 7500
+  max: 65535
   roi: ''
   gee_path: MODIS/061/MYD21C1
   gee_type: image_collection
@@ -119,17 +143,24 @@ Temperature:
   select: LST_Day
   bandname: LST_Day
   dates: true
+  coefficient: 1
   show: true
 Habitat:
   name: Habitat
+  unit: Classification index (categorical)
   roi: ''
   gee_path: projects/sat-io/open-datasets/IUCN_HABITAT/iucn_habitatclassification_composite_lvl2_ver004
   gee_type: image
   viz: {}
   bandname: comp_first
+  coefficient: 1
   show: true
 NDVI:
   name: NDVI
+  description: Normalized difference vegetation index
+  unit: index (continuous)
+  min: -1
+  max: 1
   roi: ''
   gee_path: LANDSAT/LC08/C02/T1
   gee_type: algebraic
@@ -137,6 +168,8 @@ NDVI:
   - B4
   - B3
   viz:
+    min: -1
+    max: 1
     palette:
     - "#d73027"
     - "#f46d43"
@@ -147,15 +180,23 @@ NDVI:
     - "#66bd63"
     - "#1a9850"
   bandname: nd
+  coefficient: 1
+  show: true
 NDWI:
   name: NDWI
+  description: An estimate of the water content of leaves.
+  unit: index (continuous)
+  min: -1
+  max: 1
   roi: ''
   gee_path: LANDSAT/LC08/C02/T1
   gee_type: algebraic
   normalized_difference:
-  - B3
   - B5
+  - B6
   viz:
+    min: -1
+    max: 1
     palette:
     - "#ece7f2"
     - "#d0d1e6"
@@ -166,4 +207,5 @@ NDWI:
     - "#045a8d"
     - "#023858"
   bandname: nd
+  coefficient: 1
   show: true

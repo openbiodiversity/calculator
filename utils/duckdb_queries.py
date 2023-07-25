@@ -46,6 +46,12 @@ def get_project_scores(project_name, start_year, end_year):
     ).df()
 
 
+def check_if_table_exists(table_name):
+    tables = con.execute("SHOW TABLES;").fetchall()
+    for i in range(len(tables)):
+        tables[i] = tables[i][0]
+    return table_name in tables
+
 def check_if_project_exists_for_year(project_name, year):
     return con.execute(
         "SELECT COUNT(1) FROM bioindicator WHERE (year = ? AND project_name = ?)",
@@ -55,7 +61,7 @@ def check_if_project_exists_for_year(project_name, year):
 
 def write_score_to_temptable(df):
     con.sql(
-        "CREATE OR REPLACE TABLE _temptable AS SELECT *, ROUND((value * area), 2) AS score FROM (SELECT year, project_name, ROUND(AVG(value), 2) AS value, area FROM df GROUP BY year, project_name, area ORDER BY project_name)"
+        "CREATE OR REPLACE TABLE _temptable AS SELECT *, (value * area) AS score FROM (SELECT year, project_name, metric, AVG(value * coefficient) AS value, area FROM df GROUP BY year, project_name, metric, area ORDER BY project_name, metric)"
     )
     return True
 
@@ -64,7 +70,7 @@ def get_or_create_bioindicator_table():
     con.sql(
         """
             USE climatebase;
-            CREATE TABLE IF NOT EXISTS bioindicator (year BIGINT, project_name VARCHAR(255), value DOUBLE, area DOUBLE, score DOUBLE, CONSTRAINT unique_year_project_name UNIQUE (year, project_name));
+            CREATE TABLE IF NOT EXISTS bioindicator (year BIGINT, project_name VARCHAR(255), metric VARCHAR(255), value DOUBLE, area DOUBLE, score DOUBLE, CONSTRAINT unique_year_project_name_metric UNIQUE (year, project_name, metric));
             """
     )
     return True
@@ -74,7 +80,7 @@ def upsert_project_record():
     con.sql(
         """
                 INSERT INTO bioindicator FROM _temptable
-                ON CONFLICT (year, project_name) DO UPDATE SET value = excluded.value;
+                ON CONFLICT (year, project_name, metric) DO UPDATE SET value = excluded.value;
             """
     )
     return True

@@ -1,3 +1,4 @@
+import os
 import gradio as gr
 
 from utils import duckdb_queries as dq
@@ -5,13 +6,18 @@ from utils.gradio import get_window_url_params
 from utils.indicators import IndexGenerator
 
 # Instantiate outside gradio app to avoid re-initializing GEE, which is slow
-indexgenerator = IndexGenerator(indices=["NDWI", "Water", "Protected", "Habitat"])
+indexgenerator = IndexGenerator()
+
+metric_names = os.listdir('metrics')
+for i in range(len(metric_names)):
+    metric_names[i] = metric_names[i].split('.yaml')[0].replace('_', ' ')
 
 with gr.Blocks() as demo:
     with gr.Column():
         m1 = gr.Plot()
         with gr.Row():
             project_name = gr.Dropdown([], label="Project", value="Select project")
+            metric = gr.Dropdown(metric_names, label='Metric', value='Select metric')
             start_year = gr.Number(value=2017, label="Start Year", precision=0)
             end_year = gr.Number(value=2022, label="End Year", precision=0)
         with gr.Row():
@@ -37,14 +43,19 @@ with gr.Blocks() as demo:
         projects = dq.list_projects_by_author(author_id=username)
         # Initialize the first project in the list
         project_names = projects['name'].tolist()
-        default_project = project_names[0]
-        return gr.Dropdown.update(choices=project_names, value=default_project)
+        return gr.Dropdown.update(choices=project_names)
 
     # Change the project name in the index generator object when the
     # user selects a new project
     project_name.change(
         indexgenerator.set_project,
         inputs=project_name
+    )
+
+    # Set the metric to be calculated
+    metric.change(
+        indexgenerator.set_metric,
+        inputs=metric
     )
 
     # Get url params
