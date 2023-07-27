@@ -1,6 +1,7 @@
 import os
 import gradio as gr
 import plotly.express as px
+import pandas as pd
 
 from utils import duckdb_queries as dq
 from utils.gradio import get_window_url_params
@@ -20,6 +21,8 @@ def toggle_metric_definition_box(text_input):
         return None
 
 def make_timeseries_plot(df):
+    for col in df.columns:
+        df[col] = pd.to_numeric(df[col], errors='ignore')
     return px.line(df, x='Year', y='Score (Area * Value)', markers=True)
 
 with gr.Blocks() as demo:
