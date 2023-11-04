@@ -1,7 +1,7 @@
-datasets
-plotly
-gradio
-duckdb==0.8.1 
-geemap
-segment-geospatial
-geojson
+python==3.11.6
+plotly==5.18.0
+pandas==2.1.2
+numpy==1.26.0
+gradio==4.1.1
+duckdb==0.9.1
+geemap==0.29.5
